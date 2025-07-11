@@ -32,6 +32,19 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.local
+.env.production
+
+# Additional files
+*.db
+*.sqlite
+logs/
+*.tmp
+*.temp
+
+# IDE
+.vscode/settings.json
+.idea/
 
 # vercel
 .vercel
@@ -39,3 +52,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# clerk configuration (can include secrets)
+/.clerk/
