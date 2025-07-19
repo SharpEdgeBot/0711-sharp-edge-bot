@@ -102,16 +102,7 @@ export default function ChatPage() {
               Ask me about MLB games, betting strategies, or statistical analysis
             </p>
             
-            {/* Optional Game ID input */}
-            <div className="mt-3">
-              <input
-                type="text"
-                placeholder="Game ID (optional, for specific game analysis)"
-                value={gameId}
-                onChange={(e) => setGameId(e.target.value)}
-                className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            {/* ...existing code... */}
           </div>
 
           {/* Messages */}
