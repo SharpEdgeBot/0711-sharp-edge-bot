@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
@@ -6,7 +7,7 @@ const ChatInput: React.FC<{ onSend: (msg: string) => void }> = ({ onSend }) => {
 
   return (
     <motion.div
-      className="fixed bottom-0 left-0 right-0 mx-auto max-w-2xl w-full px-4 pb-6 z-20"
+      className="w-full max-w-2xl mx-auto px-4 pb-0 z-20"
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 120 }}

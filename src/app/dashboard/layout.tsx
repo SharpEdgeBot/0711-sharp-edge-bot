@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen flex bg-[var(--background)] text-[var(--foreground)] font-sans">
       {/* Sidebar - Premium Glass Morphism */}
-      <aside className="sidebar glass flex flex-col justify-between py-8 px-4 w-72 min-h-screen shadow-xl">
+  <aside className="sidebar glass flex flex-col justify-between py-8 px-4 w-72 min-h-screen shadow-xl fixed left-0 top-0 z-40 h-screen">
         <div>
           <Link href="/" className="flex items-center gap-3 mb-10">
             <div className="w-10 h-10 bg-gradient-to-br from-[var(--accent-blue)] to-[var(--accent-green)] rounded-xl flex items-center justify-center shadow-lg">
@@ -61,23 +61,7 @@ export default async function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header - Premium Style */}
-        <header className="header glass w-full shadow-lg">
-          <div className="px-8 py-6 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <h2 className="text-2xl font-bold text-[var(--accent-blue)] tracking-wide">Dashboard</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="px-4 py-2 text-sm font-semibold rounded-full bg-[var(--bg-secondary)] text-[var(--accent-blue)] border border-[var(--accent-blue)] shadow">
-                {role === 'free' && '🆓 Free Plan'}
-                {role === 'pro' && '⭐ Pro Plan'}
-                {role === 'vip' && '💎 VIP Plan'}
-              </div>
-            </div>
-          </div>
-        </header>
-
+  <div className="flex-1 flex flex-col" style={{ marginLeft: '18rem' }}>
         {/* Main Content */}
         <main className="main-content flex-1 p-8 bg-[var(--background)]">
           {children}

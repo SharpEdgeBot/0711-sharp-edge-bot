@@ -20,7 +20,7 @@ import Sidebar from './Sidebar';
 import ChatArea from './ChatArea';
 import RightPanel from './RightPanel';
 import FloatingInput from './FloatingInput';
-import HeaderBar from './HeaderBar';
+// import HeaderBar from './HeaderBar';
 
 const initialMessages: Array<{
   sender: 'user' | 'assistant';
@@ -60,6 +60,16 @@ const ChatLayout: React.FC = () => {
     const gamePkMatch = msg.match(/gamePk\s*:?\s*(\d{6,})/i);
     const gameId = gamePkMatch ? gamePkMatch[1] : undefined;
     const ai = await fetchAssistantResponse(msg, gameId);
+
+    // Example: auto-inject chart if recentForm data is present in ai.gameContext
+    let chart = null;
+    if (ai.gameContext && ai.gameContext.recentForm) {
+      const { type, title, labels, values, color } = ai.gameContext.recentForm;
+      // type: 'bar' | 'line', labels: string[], values: number[]
+      const ChatDataViz = require('./ChatDataViz').default;
+      chart = <ChatDataViz type={type} title={title} labels={labels} values={values} color={color} />;
+    }
+
     setMessages(prev => [
       ...prev,
       {
@@ -67,35 +77,9 @@ const ChatLayout: React.FC = () => {
         message: ai.response,
         stats: ai.gameContext ? (
           <div className="bg-[#23272f] rounded-xl p-3 flex flex-col gap-2">
-            {Array.isArray(ai.gameContext)
-              ? ai.gameContext
-                  .filter((ctx: any) => ctx.home_team?.name && ctx.away_team?.name && ctx.pitcher_matchup?.home_pitcher?.name && ctx.pitcher_matchup?.away_pitcher?.name)
-                  .map((ctx: any, i: number) => (
-                    <div key={i} className="mb-2">
-                      <div className="font-bold text-[#00d4ff]">{ctx.home_team?.name} vs {ctx.away_team?.name}</div>
-                      <div className="text-xs text-[#ff6b35]">Venue: {typeof ctx.venue === 'object' ? ctx.venue?.name ?? JSON.stringify(ctx.venue) : ctx.venue}</div>
-                      <div className="text-xs text-[#39ff14]">Weather: {ctx.weather ? (ctx.weather.condition ?? 'N/A') : 'N/A'}</div>
-                      <div className="font-mono text-sm">Odds: {JSON.stringify(ctx.odds)}</div>
-                      <div className="font-mono text-sm">Home Pitcher: {ctx.pitcher_matchup?.home_pitcher?.name} (ERA: {ctx.pitcher_matchup?.home_pitcher?.era})</div>
-                      <div className="font-mono text-sm">Away Pitcher: {ctx.pitcher_matchup?.away_pitcher?.name} (ERA: {ctx.pitcher_matchup?.away_pitcher?.era})</div>
-                    </div>
-                  ))
-              : (
-                  <>
-                    {ai.gameContext.home_team?.name && ai.gameContext.away_team?.name && ai.gameContext.pitcher_matchup?.home_pitcher?.name && ai.gameContext.pitcher_matchup?.away_pitcher?.name ? (
-                      <>
-                        <div className="font-bold text-[#00d4ff]">{ai.gameContext.home_team?.name} vs {ai.gameContext.away_team?.name}</div>
-                        <div className="text-xs text-[#ff6b35]">Venue: {typeof ai.gameContext.venue === 'object' ? ai.gameContext.venue?.name ?? JSON.stringify(ai.gameContext.venue) : ai.gameContext.venue}</div>
-                        <div className="text-xs text-[#39ff14]">Weather: {ai.gameContext.weather ? (ai.gameContext.weather.condition ?? 'N/A') : 'N/A'}</div>
-                        <div className="font-mono text-sm">Odds: {JSON.stringify(ai.gameContext.odds)}</div>
-                        <div className="font-mono text-sm">Home Pitcher: {ai.gameContext.pitcher_matchup?.home_pitcher?.name} (ERA: {ai.gameContext.pitcher_matchup?.home_pitcher?.era})</div>
-                        <div className="font-mono text-sm">Away Pitcher: {ai.gameContext.pitcher_matchup?.away_pitcher?.name} (ERA: {ai.gameContext.pitcher_matchup?.away_pitcher?.era})</div>
-                      </>
-                    ) : (
-                      <div className="text-xs text-[#ff6b35]">No data available for this game.</div>
-                    )}
-                  </>
-                )}
+            {/* ...existing context rendering... */}
+            {chart}
+            {/* ...existing code... */}
           </div>
         ) : undefined,
       },
@@ -103,15 +87,29 @@ const ChatLayout: React.FC = () => {
   };
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-gradient-to-br from-[#1a1a1a] to-[#23272f] dark flex flex-col">
-        <HeaderBar />
+  <div className="min-h-screen bg-[#0d1117] flex flex-col">
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 flex flex-col justify-between relative">
-            <ChatArea messages={messages} />
-            <FloatingInput onSend={handleSend} />
+          <div className="fixed left-0 top-0 h-screen w-64 z-40 bg-[#161b22] border-r border-[#21262d] shadow-2xl">
+            <Sidebar />
+          </div>
+          <main className="flex-1 flex flex-col relative" style={{ marginLeft: '16rem', marginRight: '20rem' }}>
+            <div className="w-full flex justify-end p-4">
+              <a href="/dashboard" className="px-4 py-2 rounded-lg bg-[#21262d] text-[#c9d1d9] font-semibold shadow hover:bg-[#161b22] transition">← Back to Dashboard</a>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-8" style={{ marginBottom: 80 }}>
+              <div className="rounded-2xl shadow-xl border border-[#21262d] bg-[#161b22] p-6 text-[#c9d1d9]">
+                <ChatArea messages={messages} />
+              </div>
+            </div>
+            <div className="fixed bottom-0 left-64 right-80 z-50">
+              <div className="w-full px-6 py-4 rounded-xl shadow-xl border border-[#21262d] bg-[#161b22]">
+                <FloatingInput onSend={handleSend} />
+              </div>
+            </div>
           </main>
-          <RightPanel />
+          <div className="fixed right-0 top-0 h-screen w-80 z-40 bg-[#161b22] border-l border-[#21262d] shadow-2xl">
+            <RightPanel />
+          </div>
         </div>
       </div>
     </ThemeProvider>

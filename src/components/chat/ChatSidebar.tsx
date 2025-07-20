@@ -15,7 +15,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ history, favorites, onSelectH
       {/* Logo & Title */}
       <div className="flex items-center mb-8">
         <img src={user?.imageUrl || '/window.svg'} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
-        <span className="text-xl font-bold text-electric-blue">{user?.fullName || 'SharpEdge Sports'}</span>
+  <span className="text-xl font-bold text-electric-blue">{user?.fullName || 'MLB Betting Assistant'}</span>
       </div>
       {/* Chat History */}
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23272f] scrollbar-track-[#1a1a1a]">

@@ -1,44 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { fetchMLBSchedule } from '../../lib/mlbApi';
+import { fetchMLBSchedule, fetchTeamStats } from '../../lib/mlbApi';
 
 const ChatRightPanel: React.FC = () => {
-  const [standings, setStandings] = useState<Array<{ team: string; wins: number; losses: number; pct: number }>>([]);
+  const [standings, setStandings] = useState<Array<{ team: string; teamId: number; wins: number; losses: number; pct: number }>>([]);
   const [odds, setOdds] = useState<Array<{ home: string; away: string; market: string; value: string }>>([]);
 
   useEffect(() => {
     async function loadPanelData() {
       const today = new Date().toISOString().split('T')[0];
-      // Fetch schedule for today
-      const schedule = await fetchMLBSchedule(today, today);
-      // Standings (from today's games)
-      const teams: Record<string, { wins: number; losses: number; pct: number }> = {};
-      (schedule.dates || []).forEach((dateObj: any) => {
-        (dateObj.games || []).forEach((g: any) => {
-          const home = g.teams?.home?.team;
-          const away = g.teams?.away?.team;
-          if (home) teams[home.name] = { wins: home.wins, losses: home.losses, pct: home.winningPercentage };
-          if (away) teams[away.name] = { wins: away.wins, losses: away.losses, pct: away.winningPercentage };
-        });
-      });
-      setStandings(Object.entries(teams).map(([team, stats]) => ({ team, ...stats })));
-      // Odds (from today's games)
-      const oddsList: Array<{ home: string; away: string; market: string; value: string }> = [];
-      (schedule.dates || []).forEach((dateObj: any) => {
-        (dateObj.games || []).forEach((g: any) => {
-          if (g.odds && Array.isArray(g.odds)) {
-            g.odds.forEach((o: any) => {
-              oddsList.push({
-                home: g.teams?.home?.team?.name || '',
-                away: g.teams?.away?.team?.name || '',
-                market: o.market || '',
-                value: o.value || '',
-              });
+      try {
+        const schedule = await fetchMLBSchedule(today, today);
+        const teamObjs: any[] = [];
+        (schedule.dates || []).forEach((dateObj: any) => {
+          (dateObj.games || []).forEach((g: any) => {
+            [g.teams?.home?.team, g.teams?.away?.team].forEach((teamObj: any) => {
+              if (teamObj && teamObj.id) {
+                teamObjs.push(teamObj);
+              }
             });
-          }
+          });
         });
-      });
-      setOdds(oddsList);
+        // Remove duplicates
+        const uniqueTeams = Array.from(new Map(teamObjs.map(t => [t.id, t])).values());
+        const standingsArr = await Promise.all(uniqueTeams.map(async (teamObj: any) => {
+          try {
+            const statsData = await fetchTeamStats(teamObj.id);
+            const stats = statsData.stats?.[0]?.splits?.[0]?.stat || {};
+            return {
+              team: teamObj.name,
+              teamId: teamObj.id,
+              wins: typeof stats.wins === 'number' ? stats.wins : 0,
+              losses: typeof stats.losses === 'number' ? stats.losses : 0,
+              pct: typeof stats.pct === 'number' ? stats.pct : 0,
+            };
+          } catch (err) {
+            return {
+              team: teamObj.name,
+              teamId: teamObj.id,
+              wins: 0,
+              losses: 0,
+              pct: 0,
+            };
+          }
+        }));
+        setStandings(standingsArr);
+        // Odds logic unchanged
+        const oddsList: Array<{ home: string; away: string; market: string; value: string }> = [];
+        (schedule.dates || []).forEach((dateObj: any) => {
+          (dateObj.games || []).forEach((g: any) => {
+            if (g.odds && Array.isArray(g.odds)) {
+              g.odds.forEach((o: any) => {
+                oddsList.push({
+                  home: g.teams?.home?.team?.name || '',
+                  away: g.teams?.away?.team?.name || '',
+                  market: o.market || '',
+                  value: o.value || '',
+                });
+              });
+            }
+          });
+        });
+        setOdds(oddsList);
+      } catch (err) {
+        setStandings([]);
+        setOdds([]);
+      }
     }
     loadPanelData();
   }, []);
@@ -54,10 +81,15 @@ const ChatRightPanel: React.FC = () => {
           ) : (
             standings.map((s, idx) => (
               <div key={idx} className="flex justify-between items-center px-2 py-1 rounded bg-[#23272f] text-white font-mono">
+                <img
+                  src={`https://www.mlbstatic.com/team-logos/${s.teamId}.svg`}
+                  alt={s.team}
+                  className="w-6 h-6 mr-2 rounded-full border border-electric-blue bg-white"
+                />
                 <span className="font-bold text-electric-blue">{s.team}</span>
-                <span className="text-neon-green">{s.wins}W</span>
-                <span className="text-orange-500">{s.losses}L</span>
-                <span className="text-golden-yellow">{(s.pct * 100).toFixed(1)}%</span>
+                <span className="text-neon-green">{typeof s.wins === 'number' ? s.wins : 0}W</span>
+                <span className="text-orange-500">{typeof s.losses === 'number' ? s.losses : 0}L</span>
+                <span className="text-golden-yellow">{typeof s.pct === 'number' && s.pct > 0 ? (s.pct * 100).toFixed(1) + '%' : '--'}</span>
               </div>
             ))
           )}

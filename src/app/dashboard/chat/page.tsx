@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 function GlobalSidebar() {
   return (
     <aside className="w-64 shrink-0 bg-gray-950 border-r border-gray-800 flex flex-col py-8 px-6">
-      <div className="font-bold text-2xl mb-10 tracking-tight">SharpEdge</div>
       <nav className="flex flex-col gap-5">
         <a href="/dashboard" className="nav-link">Dashboard</a>
         <a href="/dashboard/games" className="nav-link">Games</a>
@@ -51,24 +50,14 @@ interface Message {
 
 export default function ChatDashboard() {
   const [messages, setMessages] = useState([
-    { id: "1", text: "Welcome to SharpEdge Chat!", sender: "ai", timestamp: "09:00" },
+    { id: "1", text: "Welcome to the MLB Betting Assistant!", sender: "ai", timestamp: "09:00" },
     { id: "2", text: "How can I help you today?", sender: "ai", timestamp: "09:01" },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  const [injectedContext, setInjectedContext] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Example injected context (replace with real context as needed)
-  const injectedContext = showContext
-    ? {
-        userTier: "Pro",
-        currentGame: "Yankees vs Red Sox",
-        model: "SharpEdge v2.1",
-        lastPrediction: "Over 8.5 Runs",
-        aiStatus: "Online",
-      }
-    : null;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,79 +74,121 @@ export default function ChatDashboard() {
     setMessages((msgs) => [...msgs, newMsg]);
     setInput("");
     setIsTyping(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input }),
+      });
+      if (!res.ok) {
+        setMessages((msgs) => [
+          ...msgs,
+          {
+            id: Date.now().toString() + "-ai",
+            text: "Error: Unable to contact assistant.",
+            sender: "ai",
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+        setIsTyping(false);
+        return;
+      }
+      const data = await res.json();
       setMessages((msgs) => [
         ...msgs,
         {
           id: Date.now().toString() + "-ai",
-          text: `AI: ${newMsg.text}`,
+          text: data.response || "No response.",
           sender: "ai",
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
-      setIsTyping(false);
-    }, 1200);
+      if (data.gameContext) {
+        setInjectedContext(data.gameContext);
+        setShowContext(true);
+      } else {
+        setInjectedContext(null);
+        setShowContext(false);
+      }
+    } catch (err) {
+      setMessages((msgs) => [
+        ...msgs,
+        {
+          id: Date.now().toString() + "-ai",
+          text: "Error: Unable to contact assistant.",
+          sender: "ai",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    }
+    setIsTyping(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 flex text-white">
-      {/* Sidebar */}
-      <GlobalSidebar />
-      {/* Chat Area */}
-      <main className="flex-1 flex items-center justify-center relative">
-        {/* Chat Card - Centered */}
-        <div className="modern-card flex flex-col justify-center items-center mx-auto w-full max-w-2xl" style={{ minHeight: 500 }}>
-          <div className="flex-1 chat-messages overflow-y-auto" style={{ maxHeight: 400 }}>
-            <AnimatePresence initial={false}>
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className={`chat-message ${msg.sender}`}
-                >
-                  <div className={`chat-bubble ${msg.sender}`}>{msg.text}
-                    <div className="chat-timestamp">{msg.timestamp}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {isTyping && (
-              <div className="chat-message ai">
-                <div className="chat-bubble ai">
-                  <div className="typing-indicator">
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                  </div>
+    <div className="flex h-screen bg-gradient-to-br from-gray-950 to-gray-900 text-white">
+      {/* Left Sidebar (fixed) */}
+      <div className="w-64 h-full flex-shrink-0 fixed left-0 top-0 z-40">
+        <GlobalSidebar />
+      </div>
+      {/* Main Chat Area (center, margin for sidebars) */}
+      <div className="flex-1 flex flex-col relative" style={{ marginLeft: 256, marginRight: showContext ? 384 : 0 }}>
+        {/* Chat Messages (scrollable) */}
+        <div className="flex-1 overflow-y-auto px-4 py-6" style={{ marginBottom: 80 }}>
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className={`chat-message ${msg.sender}`}
+              >
+                <div className={`chat-bubble ${msg.sender}`}>{msg.text}
+                  <div className="chat-timestamp">{msg.timestamp}</div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {isTyping && (
+            <div className="chat-message ai">
+              <div className="chat-bubble ai">
+                <div className="typing-indicator">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
                 </div>
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          {/* Input Area */}
-          <form
-            className="chat-input"
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              maxLength={300}
-              aria-label="Chat message input"
-            />
-            <button type="submit" className="modern-btn">Send</button>
-          </form>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
-      </main>
-      {/* Popup right sidebar for injected context */}
-      {showContext && <ContextSidebar context={injectedContext} onClose={() => setShowContext(false)} />}
+        {/* Chat Input (fixed at bottom, center) */}
+        <form
+          className="chat-input w-full px-4 pb-6 fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-950 to-transparent z-30"
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendMessage();
+          }}
+          style={{ height: 80, marginLeft: 256, marginRight: showContext ? 384 : 0 }}
+        >
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            maxLength={300}
+            aria-label="Chat message input"
+            className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white focus:outline-none"
+          />
+          <button type="submit" className="modern-btn mt-2 w-full">Send</button>
+        </form>
+      </div>
+      {/* Right Context Sidebar (fixed) */}
+      {showContext && (
+        <div className="h-full w-96 fixed right-0 top-0 z-50">
+          <ContextSidebar context={injectedContext} onClose={() => setShowContext(false)} />
+        </div>
+      )}
     </div>
   );
 }

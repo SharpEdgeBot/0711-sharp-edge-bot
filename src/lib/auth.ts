@@ -2,8 +2,12 @@ import { currentUser } from '@clerk/nextjs/server';
 import { SubscriptionTier } from '@/types';
 
 export async function getUserRole(): Promise<SubscriptionTier> {
-  const user = await currentUser();
-  return (user?.publicMetadata?.subscriptionTier as SubscriptionTier) || 'free';
+  try {
+    const user = await currentUser();
+    return (user?.publicMetadata?.subscriptionTier as SubscriptionTier) || 'free';
+  } catch (err) {
+    return 'free';
+  }
 }
 
 export async function getUserId(): Promise<string | null> {

@@ -34,21 +34,22 @@ export async function checkRateLimit(
   
   try {
     const current = await redis.incr(key);
-    
     if (current === 1) {
       await redis.expire(key, windowSeconds);
     }
-    
     const ttl = await redis.ttl(key);
     const resetTime = Date.now() + (ttl * 1000);
-    
     return {
       allowed: current <= limit,
       remaining: Math.max(0, limit - current),
       resetTime,
     };
   } catch (error) {
-    console.error('Rate limit check error:', error);
+  if ((error as any)?.code === 'ENOTFOUND') {
+      console.error('Redis connection error: ENOTFOUND. Check your Upstash Redis URL and network connectivity.');
+    } else {
+      console.error('Rate limit check error:', error);
+    }
     // Fail open - allow the request
     return {
       allowed: true,
@@ -64,7 +65,11 @@ export async function getCachedSchedule(date: string) {
     const cached = await redis.get(`schedule:${date}`);
     return cached;
   } catch (error) {
-    console.error('Redis get schedule error:', error);
+  if ((error as any)?.code === 'ENOTFOUND') {
+      console.error('Redis connection error: ENOTFOUND. Check your Upstash Redis URL and network connectivity.');
+    } else {
+      console.error('Redis get schedule error:', error);
+    }
     return null;
   }
 }

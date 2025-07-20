@@ -1,25 +1,24 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+
+import { NextRequest } from 'next/server';
 import { fetchPinnacleMarkets } from '@/lib/pinnacleApi';
 import { transformPinnacleOdds } from '@/lib/pinnacleOddsTransform';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
+export const GET = async (request: NextRequest) => {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
   if (!id || typeof id !== 'string') {
-    res.status(400).json({ error: 'Missing or invalid game id' });
-    return;
+    return new Response(JSON.stringify({ error: 'Missing or invalid game id' }), { status: 400 });
   }
-  // Get last 'since' value from Supabase or default to '0'
   const since = '0';
   try {
     const raw = await fetchPinnacleMarkets(since);
     const games = transformPinnacleOdds(raw);
     const game = games.find(g => g.event_id === id);
     if (!game) {
-      res.status(404).json({ error: 'Game not found' });
-      return;
+      return new Response(JSON.stringify({ error: 'Game not found' }), { status: 404 });
     }
-    res.status(200).json({ game });
+    return new Response(JSON.stringify({ game }), { status: 200 });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch MLB game' });
+    return new Response(JSON.stringify({ error: 'Failed to fetch MLB game' }), { status: 500 });
   }
-}
+};

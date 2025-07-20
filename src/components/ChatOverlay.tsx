@@ -54,7 +54,7 @@ export default function ChatOverlay() {
 
   return (
     <div className="chat-overlay glass bg-[var(--background)] text-[var(--foreground)] font-sans">
-      <div className="chat-header gradient-text">SharpEdge Chat</div>
+  <div className="chat-header gradient-text">MLB Betting Assistant</div>
       <div className="chat-messages">
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
