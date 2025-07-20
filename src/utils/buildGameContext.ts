@@ -6,11 +6,8 @@ import {
   fetchRecentForm,
   fetchHeadToHead 
 } from '@/lib/mlbApi';
-import { 
-  fetchGameOdds, 
-  fetchGamelines,
-  fetchPlayerProps 
-} from '@/lib/optimalApi';
+import { fetchPinnacleMarkets } from '@/lib/pinnacleApi';
+import { transformPinnacleOdds } from '@/lib/pinnacleOddsTransform';
 import { getCachedGameContext, setCachedGameContext } from '@/lib/redis';
 
 export async function buildGameContext(gameId: string): Promise<GameContext> {
@@ -19,45 +16,45 @@ export async function buildGameContext(gameId: string): Promise<GameContext> {
   if (cached) {
     return JSON.parse(cached as string);
   }
-  
+
   try {
     // Fetch game data from MLB API
     const gameData = await fetchMLBGame(parseInt(gameId));
     const game = gameData.gameData.game;
     const teams = gameData.gameData.teams;
-    
+
     // Fetch team stats in parallel
     const [homeStats, awayStats] = await Promise.all([
       fetchTeamStats(teams.home.id),
       fetchTeamStats(teams.away.id),
     ]);
-    
+
     // Extract starting pitchers
     const homePitcher = gameData.liveData.boxscore.teams.home.pitchers[0];
     const awayPitcher = gameData.liveData.boxscore.teams.away.pitchers[0];
-    
+
     // Fetch pitcher stats in parallel
     const [homePitcherStats, awayPitcherStats] = await Promise.all([
       fetchPitcherStats(homePitcher),
       fetchPitcherStats(awayPitcher),
     ]);
-    
+
     // Fetch recent form and head-to-head
     const [homeForm, awayForm, h2h] = await Promise.all([
       fetchRecentForm(teams.home.id),
       fetchRecentForm(teams.away.id),
       fetchHeadToHead(teams.home.id, teams.away.id),
     ]);
-    
-    // Fetch betting odds (assuming we have event_id mapping)
-    const eventId = gameId; // This would come from mapping table
-    const [moneylineOdds, totalOdds, playerProps] = await Promise.all([
-      fetchGameOdds(eventId, 'moneyline').catch(() => []),
-      fetchGamelines(eventId, 'totals').catch(() => []),
-      fetchPlayerProps(eventId).catch(() => []),
-    ]);
-    
-    // Build the game context
+
+    // Fetch Pinnacle odds
+    const since = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const rawMarkets = await fetchPinnacleMarkets(since);
+    const pinnacleMarkets = transformPinnacleOdds(rawMarkets);
+
+    // Find odds for this game
+    const oddsForGame = pinnacleMarkets.find(m => m.event_id === gameId);
+
+    // Build the game context using Pinnacle odds only
     const context: GameContext = {
       game_id: gameId,
       game_date: game.datetime,
@@ -65,11 +62,7 @@ export async function buildGameContext(gameId: string): Promise<GameContext> {
       venue: gameData.gameData.venue.name,
       home_team: processTeamStats(teams.home, homeStats),
       away_team: processTeamStats(teams.away, awayStats),
-      odds: {
-        moneyline: processMoneylineOdds(moneylineOdds),
-        runline: {}, // Would process runline odds
-        total: processTotalOdds(totalOdds),
-      },
+      odds: oddsForGame ? oddsForGame.markets : {},
       pitcher_matchup: {
         home_pitcher: processPitcherStats(homePitcherStats),
         away_pitcher: processPitcherStats(awayPitcherStats),

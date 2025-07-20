@@ -16,17 +16,17 @@ interface Props {
 
 export default function LineMovementChart({ data, market, team }: Props) {
   return (
-    <div className="w-full h-64 bg-white rounded-lg shadow p-4">
-      <div className="font-bold mb-2">Line Movement: {team} ({market})</div>
+    <div className="w-full h-64 glass rounded-xl shadow-xl p-6 bg-[var(--background)] text-[var(--foreground)] font-sans">
+      <div className="font-bold mb-3 text-[var(--accent-blue)] text-lg">Line Movement: <span className="text-[var(--accent-green)]">{team}</span> <span className="text-[var(--neutral-gray-3)]">({market})</span></div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="time" tick={{ fill: '#222' }} />
-          <YAxis tick={{ fill: '#222' }} />
-          <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey="odds" stroke="#2563eb" name="Odds" />
-          <Line type="monotone" dataKey="line" stroke="#16a34a" name="Line" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--neutral-gray-2)" />
+          <XAxis dataKey="time" tick={{ fill: 'var(--accent-blue)' }} axisLine={{ stroke: 'var(--accent-blue)' }} />
+          <YAxis tick={{ fill: 'var(--accent-green)' }} axisLine={{ stroke: 'var(--accent-green)' }} />
+          <Tooltip contentStyle={{ background: 'var(--bg-secondary)', color: 'var(--accent-blue)', borderRadius: 12, border: '1px solid var(--accent-blue)' }} />
+          <Legend wrapperStyle={{ color: 'var(--accent-blue)' }} />
+          <Line type="monotone" dataKey="odds" stroke="#00d4ff" name="Odds" strokeWidth={3} dot={{ r: 4, fill: '#00d4ff' }} />
+          <Line type="monotone" dataKey="line" stroke="#39ff14" name="Line" strokeWidth={3} dot={{ r: 4, fill: '#39ff14' }} />
         </LineChart>
       </ResponsiveContainer>
     </div>

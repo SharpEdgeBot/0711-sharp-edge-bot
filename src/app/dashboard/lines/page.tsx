@@ -22,16 +22,16 @@ export default function LinesDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white p-8">
-      <h1 className="text-3xl font-bold text-black mb-4">Betting Lines</h1>
-      <p className="text-black mb-8">View current MLB moneyline, runline, and game total odds. All text is black for maximum readability.</p>
+    <div className="min-h-screen bg-[var(--background)] p-8 text-[var(--foreground)] font-sans">
+      <h1 className="text-3xl font-bold gradient-text mb-4">Betting Lines</h1>
+      <p className="text-body mb-8">View current MLB moneyline, runline, and game total odds.</p>
       {loading ? (
-        <div className="text-black">Loading odds...</div>
+        <div className="glass rounded-xl shadow-xl p-8">Loading odds...</div>
       ) : error ? (
-        <div className="text-red-600">{error}</div>
+        <div className="glass rounded-xl shadow-xl p-8 text-[var(--accent-red)]">{error}</div>
       ) : (
-        <div className="border rounded-lg p-6 bg-white text-black">
-          <div className="font-bold mb-2">Live Odds</div>
+        <div className="modern-card">
+          <div className="font-bold mb-2 gradient-text">Live Odds</div>
           <GameLinesTable games={odds.map((game: any) => ({
             ...game,
             offers: (game.odds?.filter?.((o: any) => ['moneyline', 'spread', 'total'].includes(o.offerType)) ?? [])

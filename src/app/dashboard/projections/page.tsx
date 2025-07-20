@@ -27,19 +27,19 @@ export default function ProjectionsDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-8">
-      <h1 className="text-3xl font-bold text-black mb-4">AI Projections</h1>
-      <p className="text-black mb-8">View model-based predictions for MLB games and player performance. All text is black for maximum readability.</p>
+    <div className="min-h-screen bg-[var(--background)] p-8 text-[var(--foreground)] font-sans">
+      <h1 className="text-3xl font-bold gradient-text mb-4">AI Projections</h1>
+      <p className="text-body mb-8">View model-based predictions for MLB games and player performance.</p>
       {loading ? (
-        <div className="text-black">Loading projections...</div>
+        <div className="glass rounded-xl shadow-xl p-8">Loading projections...</div>
       ) : error ? (
-        <div className="text-red-600">{error}</div>
+        <div className="glass rounded-xl shadow-xl p-8 text-[var(--accent-red)]">{error}</div>
       ) : (
-        <div className="border rounded-lg p-6 bg-white text-black">
-          <div className="font-bold mb-2">Live Projections</div>
-          <table className="w-full text-black">
+        <div className="modern-card">
+          <div className="font-bold mb-2 gradient-text">Live Projections</div>
+          <table className="modern-table">
             <thead>
-              <tr className="border-b">
+              <tr>
                 <th className="py-2 text-left">Game</th>
                 <th className="py-2 text-left">Win Probability</th>
                 <th className="py-2 text-left">Projected Runs (O/U)</th>
@@ -48,7 +48,7 @@ export default function ProjectionsDashboard() {
             <tbody>
               {odds.map((game: any, idx: number) =>
                 game.gamelines?.offers?.map((offer: any, j: number) => (
-                  <tr key={`${game.id}-${offer.sportsbook}-${offer.offerType}-${j}`}>
+                  <tr key={`${game.id}-${offer.sportsbook}-${offer.offerType}-${j}`}> 
                     <td>{game.away_display} vs {game.home_display}</td>
                     <td>
                       {offer.offerType === 'moneyline'

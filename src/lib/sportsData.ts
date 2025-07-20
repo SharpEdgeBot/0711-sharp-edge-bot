@@ -21,7 +21,7 @@ export interface PlayerStats {
 }
 
 export interface BettingLine {
-  marketType: 'moneyline' | 'runline' | 'total';
+  marketType: string;
   bookmaker: string;
   lineValue: number;
   payout: number;
@@ -36,7 +36,7 @@ export interface GameContext {
   awayTeam: TeamStats;
   homePitcher: PlayerStats;
   awayPitcher: PlayerStats;
-  bettingLines: BettingLine[];
+  odds: Record<string, any>; // Pinnacle odds markets
   weather?: any;
   venue?: any;
   status?: any;
@@ -206,6 +206,6 @@ export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId
     awayTeam,
     homePitcher,
     awayPitcher,
-    bettingLines,
+    odds: oddsArr,
   };
 }

@@ -1,7 +1,6 @@
-import React, { useMemo } from 'react';
-import { OptimalBetEvent } from '@/lib/oddsApi';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LineMovementChart from './LineMovementChart';
+import { getCachedOdds, setCachedOdds } from '@/utils/oddsCache';
 
 interface Offer {
   sportsbook: string;
@@ -40,24 +39,28 @@ function getPinnacleFairPrice(offers: Offer[]) {
 
 function calculateEV(offer: Offer, fair: Offer | null) {
   if (!fair) return null;
-  // EV = (offered odds - fair odds) / abs(fair odds)
   return ((offer.oddsDecimal - fair.oddsDecimal) / Math.abs(fair.oddsDecimal)) * 100;
 }
 
-export default function GameLinesTable({ games }: Props) {
+const GameLinesTable: React.FC<Props> = ({ games }) => {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<'ev' | 'odds' | 'line' | 'game' | 'market'>('ev');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [openChartIdx, setOpenChartIdx] = useState<number | null>(null);
+  const [cachedRows, setCachedRows] = useState<any[]>([]);
 
-  const rows = useMemo(() => {
+  useEffect(() => {
     let allRows: any[] = [];
     for (const game of games) {
-      const offers = filterMarkets(game.offers || []);
+      const cacheKey = game.id;
+      let offers = getCachedOdds(cacheKey);
+      if (!offers) {
+        offers = filterMarkets(game.offers || []);
+        setCachedOdds(cacheKey, offers, 6);
+      }
       const fair = getPinnacleFairPrice(offers);
       for (const offer of offers) {
         const ev = calculateEV(offer, fair);
-        // Only current odds available, so use as both open and close
         allRows.push({
           ...game,
           ...offer,
@@ -79,101 +82,98 @@ export default function GameLinesTable({ games }: Props) {
     }
     if (sortKey) {
       allRows = allRows.sort((a, b) => {
-        let vA = a[sortKey] ?? 0;
-        let vB = b[sortKey] ?? 0;
-        if (typeof vA === 'string') vA = vA.toLowerCase();
-        if (typeof vB === 'string') vB = vB.toLowerCase();
-        if (sortDir === 'asc') return vA > vB ? 1 : vA < vB ? -1 : 0;
-        return vA < vB ? 1 : vA > vB ? -1 : 0;
+        if (sortKey === 'ev') {
+          return (a.ev ?? 0) - (b.ev ?? 0);
+        } else if (sortKey === 'odds') {
+          return (a.oddsAmerican ?? 0) - (b.oddsAmerican ?? 0);
+        } else if (sortKey === 'line') {
+          return (a.line ?? 0) - (b.line ?? 0);
+        } else if (sortKey === 'game') {
+          return a.start_date.localeCompare(b.start_date);
+        } else if (sortKey === 'market') {
+          return a.offerType.localeCompare(b.offerType);
+        }
+        return 0;
       });
     }
-    return allRows;
+    setCachedRows(sortDir === 'asc' ? allRows : allRows.reverse());
   }, [games, search, sortKey, sortDir]);
 
   return (
-    <div className="w-full">
-      <div className="flex gap-4 mb-4 items-center">
+    <div className="w-full overflow-x-auto bg-[var(--background)] text-[var(--foreground)] font-sans">
+      <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
         <input
-          className="border rounded px-3 py-2 text-black bg-white w-64"
-          placeholder="Search team..."
+          className="px-4 py-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--accent-blue)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] transition w-full md:w-72"
+          type="text"
+          placeholder="Search teams..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
         />
-        <select
-          className="border rounded px-2 py-2 text-black bg-white"
-          value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as any)}
-        >
-          <option value="ev">+EV</option>
-          <option value="odds">Odds</option>
-          <option value="line">Line</option>
-          <option value="game">Game</option>
-          <option value="market">Market</option>
-        </select>
-        <button
-          className="border rounded px-2 py-2 text-black bg-white"
-          onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-        >
-          {sortDir === 'asc' ? 'Asc' : 'Desc'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            className={`modern-btn ${sortKey === 'ev' ? 'shadow-lg' : ''}`}
+            onClick={() => setSortKey('ev')}
+          >EV</button>
+          <button
+            className={`modern-btn ${sortKey === 'odds' ? 'shadow-lg' : ''}`}
+            onClick={() => setSortKey('odds')}
+          >Odds</button>
+          <button
+            className={`modern-btn ${sortKey === 'line' ? 'shadow-lg' : ''}`}
+            onClick={() => setSortKey('line')}
+          >Line</button>
+        </div>
       </div>
-      <div className="overflow-x-auto rounded-lg shadow">
-        <table className="min-w-full bg-white text-black">
-          <thead>
-            <tr className="border-b">
-              <th className="py-2 px-2 text-left">Game</th>
-              <th className="py-2 px-2 text-left">Market</th>
-              <th className="py-2 px-2 text-left">Line</th>
-              <th className="py-2 px-2 text-left">Odds</th>
-              <th className="py-2 px-2 text-left">Bookmaker</th>
-              <th className="py-2 px-2 text-left">Fair Price (Pinnacle)</th>
-              <th className="py-2 px-2 text-left">+EV (%)</th>
-              <th className="py-2 px-2 text-left">Line Movement</th>
+      <table className="modern-table glass rounded-xl shadow-xl">
+        <thead>
+          <tr>
+            <th>Game</th>
+            <th>Market</th>
+            <th>Sportsbook</th>
+            <th>Odds</th>
+            <th>Line</th>
+            <th>EV (%)</th>
+            <th>Chart</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cachedRows.map((row, idx) => (
+            <tr
+              key={row.id + row.sportsbook + row.offerType + '-' + idx}
+              className="hover:bg-[var(--accent-blue)] hover:text-[var(--background)] transition cursor-pointer"
+              onClick={() => setOpenChartIdx(openChartIdx === idx ? null : idx)}
+            >
+              <td className="font-semibold">
+                <span className="text-[var(--accent-blue)]">{row.away_display}</span> @ <span className="text-[var(--accent-green)]">{row.home_display}</span>
+                <div className="text-xs text-[var(--neutral-gray-3)]">{row.start_date}</div>
+              </td>
+              <td>{row.offerType}</td>
+              <td>{row.sportsbook}</td>
+              <td className={row.oddsAmerican > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>{row.oddsAmerican}</td>
+              <td>{row.line ?? '-'}</td>
+              <td className={row.ev > 0 ? 'text-[var(--accent-green)] font-bold' : 'text-[var(--accent-red)] font-bold'}>
+                {row.ev ? row.ev.toFixed(2) : '-'}
+              </td>
+              <td>
+                <button className="modern-btn px-2 py-1 text-xs" onClick={e => { e.stopPropagation(); setOpenChartIdx(openChartIdx === idx ? null : idx); }}>
+                  {openChartIdx === idx ? 'Hide' : 'Show'}
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <React.Fragment key={row.id + row.sportsbook + row.offerType + idx}>
-                <tr className="border-b hover:bg-gray-100">
-                  <td>{row.away_display} vs {row.home_display}</td>
-                  <td>{row.offerType}</td>
-                  <td>{row.line ?? '-'}</td>
-                  <td>{row.oddsAmerican} ({row.oddsDecimal.toFixed(2)})</td>
-                  <td>{row.sportsbook}</td>
-                  <td>
-                    {row.fair ? `${row.fair.oddsAmerican} (${row.fair.oddsDecimal.toFixed(2)})` : 'N/A'}
-                  </td>
-                  <td className={row.ev > 0 ? 'text-green-600 font-bold' : row.ev < 0 ? 'text-red-600' : ''}>
-                    {row.ev !== null ? row.ev.toFixed(2) : 'N/A'}
-                  </td>
-                  <td>
-                    <button
-                      className="border rounded px-2 py-1 text-xs bg-blue-100 text-blue-800 hover:bg-blue-200"
-                      onClick={() => setOpenChartIdx(openChartIdx === idx ? null : idx)}
-                    >
-                      {openChartIdx === idx ? 'Hide Chart' : 'Show Chart'}
-                    </button>
-                  </td>
-                </tr>
-                {openChartIdx === idx && (
-                  <tr>
-                    <td colSpan={8}>
-                      <div className="py-4">
-                        {/* Chart for line movement (open/close odds) */}
-                        <LineMovementChart
-                          data={row.lineMovement}
-                          market={row.offerType}
-                          team={row.isHomeTeam ? row.home_display : row.away_display}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
+      {openChartIdx !== null && (
+        <div className="mt-6 p-6 glass rounded-xl shadow-xl animate-fade-in">
+          <LineMovementChart
+            data={cachedRows[openChartIdx].lineMovement}
+            market={cachedRows[openChartIdx].offerType}
+            team={cachedRows[openChartIdx].home_display}
+          />
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default GameLinesTable;

@@ -7,11 +7,7 @@ export interface GameContext {
   venue: string;
   home_team: TeamStats;
   away_team: TeamStats;
-  odds: {
-    moneyline: Record<string, number>;
-    runline: Record<string, number>;
-    total: Record<string, number>;
-  };
+  odds: Record<string, any>; // Pinnacle odds markets
   pitcher_matchup: {
     home_pitcher: PitcherStats;
     away_pitcher: PitcherStats;
@@ -22,6 +18,9 @@ export interface GameContext {
     away: FormStats;
   };
   head_to_head: H2HStats;
+  weather?: any;
+  venue_info?: any;
+  status?: any;
 }
 
 export interface TeamStats {
@@ -143,42 +142,8 @@ export interface ChatMessage {
 }
 
 // API Response Types
-export interface MLBScheduleResponse {
-  dates: Array<{
-    date: string;
-    games: Array<{
-      gamePk: number;
-      gameType: string;
-      season: string;
-      teams: {
-        away: { team: { id: number; name: string } };
-        home: { team: { id: number; name: string } };
-      };
-      status: { abstractGameState: string };
-    }>;
-  }>;
-}
-
-export interface OptimalBetEvent {
-  event_id: string;
-  date: string;
-  teams: {
-    home: string;
-    away: string;
-  };
-  venue: string;
-}
-
-export interface OptimalBetMarket {
-  market_id: string;
-  event_id: string;
-  market_type: string;
-  outcomes: Array<{
-    team?: string;
-    outcome?: string;
-    odds: number;
-  }>;
-}
+// ...existing code...
+// ...existing code...
 
 // Feature Analysis Types
 export interface FeatureImportance {

@@ -21,19 +21,19 @@ export default function PropsDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white p-8">
-      <h1 className="text-3xl font-bold text-black mb-4">Player Props</h1>
-      <p className="text-black mb-8">Analyze MLB player prop bets and projections. All text is black for maximum readability.</p>
+    <div className="min-h-screen bg-[var(--background)] p-8 text-[var(--foreground)] font-sans">
+      <h1 className="text-3xl font-bold gradient-text mb-4">Player Props</h1>
+      <p className="text-body mb-8">Analyze MLB player prop bets and projections.</p>
       {loading ? (
-        <div className="text-black">Loading player props...</div>
+        <div className="glass rounded-xl shadow-xl p-8">Loading player props...</div>
       ) : error ? (
-        <div className="text-red-600">{error}</div>
+        <div className="glass rounded-xl shadow-xl p-8 text-[var(--accent-red)]">{error}</div>
       ) : (
-        <div className="border rounded-lg p-6 bg-white text-black">
-          <div className="font-bold mb-2">Live Player Props</div>
-          <table className="w-full text-black">
+        <div className="modern-card">
+          <div className="font-bold mb-2 gradient-text">Live Player Props</div>
+          <table className="modern-table">
             <thead>
-              <tr className="border-b">
+              <tr>
                 <th className="py-2 text-left">Player</th>
                 <th className="py-2 text-left">Prop</th>
                 <th className="py-2 text-left">Line</th>

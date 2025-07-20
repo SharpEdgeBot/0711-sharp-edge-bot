@@ -29,7 +29,7 @@ export async function getRemainingMessages(
 
   const usedMessages = data?.message_count || 0;
   const limit = DAILY_LIMITS[role];
-  
+
   return Math.max(0, limit - usedMessages);
 }
 
