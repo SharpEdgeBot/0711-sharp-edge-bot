@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from './supabase';
+import { supabase } from './supabase';
 import { SubscriptionTier } from '@/types';
 
 const DAILY_LIMITS = {

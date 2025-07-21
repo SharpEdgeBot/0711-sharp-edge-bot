@@ -16,11 +16,11 @@ export async function getCachedGameContext(gameId: string) {
   }
 }
 
-export async function setCachedGameContext(gameId: string, context: any, ttlSeconds = 600) {
+export async function setCachedGameContext(gameId: string, context: unknown, ttlSeconds = 600) {
   try {
     await redis.setex(`game_context:${gameId}`, ttlSeconds, JSON.stringify(context));
   } catch (error) {
-    console.error('Redis set error:', error);
+        console.error('Redis set error:', error as { code?: string });
   }
 }
 
@@ -45,7 +45,7 @@ export async function checkRateLimit(
       resetTime,
     };
   } catch (error) {
-  if ((error as any)?.code === 'ENOTFOUND') {
+  if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'ENOTFOUND') {
       console.error('Redis connection error: ENOTFOUND. Check your Upstash Redis URL and network connectivity.');
     } else {
       console.error('Rate limit check error:', error);
@@ -65,7 +65,7 @@ export async function getCachedSchedule(date: string) {
     const cached = await redis.get(`schedule:${date}`);
     return cached;
   } catch (error) {
-  if ((error as any)?.code === 'ENOTFOUND') {
+  if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'ENOTFOUND') {
       console.error('Redis connection error: ENOTFOUND. Check your Upstash Redis URL and network connectivity.');
     } else {
       console.error('Redis get schedule error:', error);
@@ -74,11 +74,11 @@ export async function getCachedSchedule(date: string) {
   }
 }
 
-export async function setCachedSchedule(date: string, schedule: any, ttlSeconds = 3600) {
+export async function setCachedSchedule(date: string, schedule: unknown, ttlSeconds = 3600) {
   try {
     await redis.setex(`schedule:${date}`, ttlSeconds, JSON.stringify(schedule));
   } catch (error) {
-    console.error('Redis set schedule error:', error);
+        console.error('Redis set schedule error:', error as { code?: string });
   }
 }
 
@@ -96,7 +96,7 @@ export async function getCachedOdds(eventId: string, marketType: string) {
 export async function setCachedOdds(
   eventId: string, 
   marketType: string, 
-  odds: any, 
+  odds: unknown, 
   ttlSeconds = 300
 ) {
   try {
@@ -106,6 +106,6 @@ export async function setCachedOdds(
       JSON.stringify(odds)
     );
   } catch (error) {
-    console.error('Redis set odds error:', error);
+        console.error('Redis set odds error:', error as { code?: string });
   }
 }

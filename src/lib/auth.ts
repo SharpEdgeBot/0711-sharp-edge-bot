@@ -1,26 +1,11 @@
-import { currentUser } from '@clerk/nextjs/server';
-import { SubscriptionTier } from '@/types';
-
-export async function getUserRole(): Promise<SubscriptionTier> {
+// All server-only code removed. Only client-safe code remains here.
+export async function getUserRoleClient(): Promise<string> {
+  if (typeof window === 'undefined') return 'free';
   try {
-    const user = await currentUser();
-    return (user?.publicMetadata?.subscriptionTier as SubscriptionTier) || 'free';
-  } catch (err) {
+    // @ts-expect-error: Clerk types are not available in this context (server-only import)
+    const user = window.Clerk?.user || null;
+    return (user?.publicMetadata?.subscriptionTier as string) || 'free';
+  } catch {
     return 'free';
   }
-}
-
-export async function getUserId(): Promise<string | null> {
-  const user = await currentUser();
-  return user?.id || null;
-}
-
-export function hasAccess(userRole: SubscriptionTier, requiredRole: SubscriptionTier): boolean {
-  const roleHierarchy = {
-    free: 0,
-    pro: 1,
-    vip: 2,
-  };
-  
-  return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }

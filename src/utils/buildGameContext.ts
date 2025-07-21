@@ -1,4 +1,4 @@
-import { GameContext, TeamStats, PitcherStats, FormStats, H2HStats } from '@/types';
+import { GameContext, TeamStats, PitcherStats } from '@/types';
 import { 
   fetchMLBGame, 
   fetchTeamStats, 
@@ -6,8 +6,9 @@ import {
   fetchRecentForm,
   fetchHeadToHead 
 } from '@/lib/mlbApi';
-import { fetchPinnacleMarkets } from '@/lib/pinnacleApi';
+import { fetchPinnacleOdds } from '@/lib/pinnacleApi';
 import { transformPinnacleOdds } from '@/lib/pinnacleOddsTransform';
+import type { NormalizedOdds as _NormalizedOdds } from '@/lib/pinnacleOddsTransform';
 import { getCachedGameContext, setCachedGameContext } from '@/lib/redis';
 
 export async function buildGameContext(gameId: string): Promise<GameContext> {
@@ -47,13 +48,10 @@ export async function buildGameContext(gameId: string): Promise<GameContext> {
     ]);
 
     // Fetch Pinnacle odds
-    const since = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const rawMarkets = await fetchPinnacleMarkets(since);
-    const pinnacleMarkets = transformPinnacleOdds(rawMarkets);
-
-    // Find odds for this game
-    const oddsForGame = pinnacleMarkets.find(m => m.event_id === gameId);
-
+    const rawMarkets = await fetchPinnacleOdds();
+    const pinnacleMarkets = rawMarkets ? transformPinnacleOdds(rawMarkets) : [];
+    // Find odds for this game (NormalizedOdds uses gameId)
+    const oddsForGame = pinnacleMarkets.filter(m => m.gameId === gameId);
     // Build the game context using Pinnacle odds only
     const context: GameContext = {
       game_id: gameId,
@@ -62,7 +60,7 @@ export async function buildGameContext(gameId: string): Promise<GameContext> {
       venue: gameData.gameData.venue.name,
       home_team: processTeamStats(teams.home, homeStats),
       away_team: processTeamStats(teams.away, awayStats),
-      odds: oddsForGame ? oddsForGame.markets : {},
+      odds: oddsForGame,
       pitcher_matchup: {
         home_pitcher: processPitcherStats(homePitcherStats),
         away_pitcher: processPitcherStats(awayPitcherStats),
@@ -85,34 +83,81 @@ export async function buildGameContext(gameId: string): Promise<GameContext> {
   }
 }
 
-function processTeamStats(team: any, stats: any): TeamStats {
-  const teamStats = stats.stats?.[0]?.splits?.[0]?.stat || {};
-  
+
+function processTeamStats(team: unknown, stats: unknown): TeamStats {
+  let teamStats: Record<string, unknown> = {};
+  if (
+    stats && typeof stats === 'object' &&
+    'stats' in stats && Array.isArray((stats as { stats?: unknown[] }).stats)
+  ) {
+    const statsArr = (stats as { stats?: unknown[] }).stats!;
+    if (
+      statsArr[0] && typeof statsArr[0] === 'object' &&
+      'splits' in statsArr[0] &&
+      Array.isArray((statsArr[0] as { splits?: unknown[] }).splits)
+    ) {
+      const splits = (statsArr[0] as { splits?: Array<{ stat?: Record<string, unknown> }> }).splits;
+      if (splits && splits[0]?.stat && typeof splits[0].stat === 'object') {
+        teamStats = splits[0].stat;
+      }
+    }
+  }
   return {
-    name: team.name,
+    name: (team && typeof team === 'object' && 'name' in team && typeof (team as { name?: string }).name === 'string') ? (team as { name: string }).name : '',
     offense: {
-      avg: parseFloat(teamStats.avg || '0'),
-      obp: parseFloat(teamStats.obp || '0'),
-      slg: parseFloat(teamStats.slg || '0'),
+      avg: parseFloat((teamStats.avg as string) || '0'),
+      obp: parseFloat((teamStats.obp as string) || '0'),
+      slg: parseFloat((teamStats.slg as string) || '0'),
       wRC_plus: 100, // Would calculate from advanced stats
     },
     defense: {
-      avg: parseFloat(teamStats.era || '0'),
-      obp: parseFloat(teamStats.whip || '0'),
+      avg: parseFloat((teamStats.era as string) || '0'),
+      obp: parseFloat((teamStats.whip as string) || '0'),
       slg: 0,
       wRC_plus: 100,
     },
   };
 }
 
-function processPitcherStats(stats: any): PitcherStats {
-  const pitcherStats = stats.stats?.[0]?.splits?.[0]?.stat || {};
-  
+
+function processPitcherStats(stats: unknown): PitcherStats {
+  let pitcherStats: Record<string, unknown> = {};
+  let name = 'Unknown';
+  let handedness: 'L' | 'R' = 'R';
+  if (
+    stats && typeof stats === 'object' &&
+    'stats' in stats && Array.isArray((stats as { stats?: unknown[] }).stats)
+  ) {
+    const statsArr = (stats as { stats?: unknown[] }).stats!;
+    if (
+      statsArr[0] && typeof statsArr[0] === 'object' &&
+      'splits' in statsArr[0] &&
+      Array.isArray((statsArr[0] as { splits?: unknown[] }).splits)
+    ) {
+      const splits = (statsArr[0] as { splits?: Array<{ stat?: Record<string, unknown> }> }).splits;
+      if (splits && splits[0]?.stat && typeof splits[0].stat === 'object') {
+        pitcherStats = splits[0].stat;
+      }
+    }
+  }
+  if (
+    stats && typeof stats === 'object' &&
+    'people' in stats && Array.isArray((stats as { people?: unknown[] }).people) &&
+    (stats as { people?: unknown[] }).people![0]
+  ) {
+    const person = (stats as { people?: Array<{ fullName?: string; pitchHand?: { code?: string } }> }).people![0];
+    if (person.fullName && typeof person.fullName === 'string') {
+      name = person.fullName;
+    }
+    if (person.pitchHand && typeof person.pitchHand.code === 'string' && (person.pitchHand.code === 'L' || person.pitchHand.code === 'R')) {
+      handedness = person.pitchHand.code;
+    }
+  }
   return {
-    name: stats.people?.[0]?.fullName || 'Unknown',
-    era: parseFloat(pitcherStats.era || '0'),
-    k_rate: parseFloat(pitcherStats.strikeoutsPer9Inn || '0'),
-    handedness: stats.people?.[0]?.pitchHand?.code || 'R',
+    name,
+    era: parseFloat((pitcherStats.era as string) || '0'),
+    k_rate: parseFloat((pitcherStats.strikeoutsPer9Inn as string) || '0'),
+    handedness,
     vs_left: {
       avg: 0.250, // Would get from splits
       obp: 0.320,
@@ -128,11 +173,11 @@ function processPitcherStats(stats: any): PitcherStats {
   };
 }
 
-function processMoneylineOdds(odds: any[]): Record<string, number> {
+function _processMoneylineOdds(odds: Array<{ outcomes?: Array<{ team?: string; odds: number }> }>): Record<string, number> {
   const result: Record<string, number> = {};
   
   odds.forEach(market => {
-    market.outcomes?.forEach((outcome: any) => {
+    market.outcomes?.forEach((outcome) => {
       if (outcome.team) {
         result[outcome.team] = outcome.odds;
       }
@@ -142,7 +187,7 @@ function processMoneylineOdds(odds: any[]): Record<string, number> {
   return result;
 }
 
-function processTotalOdds(totals: any[]): Record<string, number> {
+function _processTotalOdds(totals: Array<{ line?: string; odds: { over: number; under: number } }>): Record<string, number> {
   const result: Record<string, number> = {};
   
   totals.forEach(total => {

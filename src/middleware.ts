@@ -24,7 +24,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     // Check VIP-only routes
     if (isVipRoute(req)) {
-      const metadata = (sessionClaims && typeof sessionClaims.metadata === 'object') ? sessionClaims.metadata as Record<string, any> : {};
+      const metadata = (sessionClaims && typeof sessionClaims.metadata === 'object') ? sessionClaims.metadata as Record<string, unknown> : {};
       const subscriptionTier = metadata.subscriptionTier || 'free';
       if (subscriptionTier !== 'vip') {
         const upgradeUrl = new URL('/pricing', req.url);

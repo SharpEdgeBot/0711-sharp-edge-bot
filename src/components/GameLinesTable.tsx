@@ -45,21 +45,28 @@ function calculateEV(offer: Offer, fair: Offer | null) {
 const GameLinesTable: React.FC<Props> = ({ games }) => {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<'ev' | 'odds' | 'line' | 'game' | 'market'>('ev');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortDir] = useState<'asc' | 'desc'>('desc');
   const [openChartIdx, setOpenChartIdx] = useState<number | null>(null);
-  const [cachedRows, setCachedRows] = useState<any[]>([]);
+  // Define the type for the table row
+  type TableRow = GameLineRow & Offer & {
+    fair: Offer | null;
+    ev: number | null;
+    lineMovement: Array<{ time: string; odds: number; line: number; sportsbook: string }>;
+  };
+  const [cachedRows, setCachedRows] = useState<TableRow[]>([]);
 
   useEffect(() => {
-    let allRows: any[] = [];
+    let allRows: TableRow[] = [];
     for (const game of games) {
       const cacheKey = game.id;
       let offers = getCachedOdds(cacheKey);
-      if (!offers) {
+      if (!Array.isArray(offers)) {
         offers = filterMarkets(game.offers || []);
         setCachedOdds(cacheKey, offers, 6);
       }
-      const fair = getPinnacleFairPrice(offers);
-      for (const offer of offers) {
+      const offersArr = offers as Offer[];
+      const fair = getPinnacleFairPrice(offersArr);
+      for (const offer of offersArr) {
         const ev = calculateEV(offer, fair);
         allRows.push({
           ...game,
@@ -67,31 +74,46 @@ const GameLinesTable: React.FC<Props> = ({ games }) => {
           fair,
           ev,
           lineMovement: [
-            { time: 'Open', odds: offer.oddsAmerican, line: offer.line, sportsbook: offer.sportsbook },
-            { time: 'Close', odds: offer.oddsAmerican, line: offer.line, sportsbook: offer.sportsbook },
+            { time: 'Open', odds: offer.oddsAmerican, line: typeof offer.line === 'number' ? offer.line : 0, sportsbook: offer.sportsbook },
+            { time: 'Close', odds: offer.oddsAmerican, line: typeof offer.line === 'number' ? offer.line : 0, sportsbook: offer.sportsbook },
           ],
         });
       }
     }
     if (search) {
-      allRows = allRows.filter(
-        (row) =>
-          row.away_display.toLowerCase().includes(search.toLowerCase()) ||
-          row.home_display.toLowerCase().includes(search.toLowerCase())
+      allRows = allRows.filter((row) =>
+        typeof row === 'object' && row !== null &&
+        'away_display' in row && typeof (row as TableRow).away_display === 'string' &&
+        'home_display' in row && typeof (row as TableRow).home_display === 'string' &&
+        ((row as TableRow).away_display.toLowerCase().includes(search.toLowerCase()) ||
+          (row as TableRow).home_display.toLowerCase().includes(search.toLowerCase()))
       );
     }
     if (sortKey) {
       allRows = allRows.sort((a, b) => {
-        if (sortKey === 'ev') {
-          return (a.ev ?? 0) - (b.ev ?? 0);
-        } else if (sortKey === 'odds') {
-          return (a.oddsAmerican ?? 0) - (b.oddsAmerican ?? 0);
-        } else if (sortKey === 'line') {
-          return (a.line ?? 0) - (b.line ?? 0);
-        } else if (sortKey === 'game') {
-          return a.start_date.localeCompare(b.start_date);
-        } else if (sortKey === 'market') {
-          return a.offerType.localeCompare(b.offerType);
+        // Type guard for TableRow
+        if (
+          typeof a === 'object' && a !== null &&
+          typeof b === 'object' && b !== null &&
+          'ev' in a && 'ev' in b &&
+          'oddsAmerican' in a && 'oddsAmerican' in b &&
+          'line' in a && 'line' in b &&
+          'start_date' in a && 'start_date' in b &&
+          'offerType' in a && 'offerType' in b
+        ) {
+          const rowA = a as TableRow;
+          const rowB = b as TableRow;
+          if (sortKey === 'ev') {
+            return (rowA.ev ?? 0) - (rowB.ev ?? 0);
+          } else if (sortKey === 'odds') {
+            return (rowA.oddsAmerican ?? 0) - (rowB.oddsAmerican ?? 0);
+          } else if (sortKey === 'line') {
+            return (rowA.line ?? 0) - (rowB.line ?? 0);
+          } else if (sortKey === 'game') {
+            return rowA.start_date.localeCompare(rowB.start_date);
+          } else if (sortKey === 'market') {
+            return rowA.offerType.localeCompare(rowB.offerType);
+          }
         }
         return 0;
       });
@@ -137,41 +159,63 @@ const GameLinesTable: React.FC<Props> = ({ games }) => {
           </tr>
         </thead>
         <tbody>
-          {cachedRows.map((row, idx) => (
-            <tr
-              key={row.id + row.sportsbook + row.offerType + '-' + idx}
-              className="hover:bg-[var(--accent-blue)] hover:text-[var(--background)] transition cursor-pointer"
-              onClick={() => setOpenChartIdx(openChartIdx === idx ? null : idx)}
-            >
-              <td className="font-semibold">
-                <span className="text-[var(--accent-blue)]">{row.away_display}</span> @ <span className="text-[var(--accent-green)]">{row.home_display}</span>
-                <div className="text-xs text-[var(--neutral-gray-3)]">{row.start_date}</div>
-              </td>
-              <td>{row.offerType}</td>
-              <td>{row.sportsbook}</td>
-              <td className={row.oddsAmerican > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>{row.oddsAmerican}</td>
-              <td>{row.line ?? '-'}</td>
-              <td className={row.ev > 0 ? 'text-[var(--accent-green)] font-bold' : 'text-[var(--accent-red)] font-bold'}>
-                {row.ev ? row.ev.toFixed(2) : '-'}
-              </td>
-              <td>
-                <button className="modern-btn px-2 py-1 text-xs" onClick={e => { e.stopPropagation(); setOpenChartIdx(openChartIdx === idx ? null : idx); }}>
-                  {openChartIdx === idx ? 'Hide' : 'Show'}
-                </button>
-              </td>
-            </tr>
-          ))}
+          {cachedRows.map((row, idx) => {
+            // Type guard for TableRow
+            if (
+              typeof row === 'object' && row !== null &&
+              'id' in row && 'sportsbook' in row && 'offerType' in row &&
+              'away_display' in row && 'home_display' in row && 'start_date' in row &&
+              'oddsAmerican' in row && 'line' in row && 'ev' in row
+            ) {
+              const r = row as TableRow;
+              return (
+                <tr
+                  key={r.id + r.sportsbook + r.offerType + '-' + idx}
+                  className="hover:bg-[var(--accent-blue)] hover:text-[var(--background)] transition cursor-pointer"
+                  onClick={() => setOpenChartIdx(openChartIdx === idx ? null : idx)}
+                >
+                  <td className="font-semibold">
+                    <span className="text-[var(--accent-blue)]">{r.away_display}</span> @ <span className="text-[var(--accent-green)]">{r.home_display}</span>
+                    <div className="text-xs text-[var(--neutral-gray-3)]">{r.start_date}</div>
+                  </td>
+                  <td>{r.offerType}</td>
+                  <td>{r.sportsbook}</td>
+                  <td className={r.oddsAmerican > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>{r.oddsAmerican}</td>
+                  <td>{r.line ?? '-'}</td>
+                  <td className={r.ev && r.ev > 0 ? 'text-[var(--accent-green)] font-bold' : 'text-[var(--accent-red)] font-bold'}>
+                    {r.ev ? r.ev.toFixed(2) : '-'}
+                  </td>
+                  <td>
+                    <button className="modern-btn px-2 py-1 text-xs" onClick={e => { e.stopPropagation(); setOpenChartIdx(openChartIdx === idx ? null : idx); }}>
+                      {openChartIdx === idx ? 'Hide' : 'Show'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            }
+            return null;
+          })}
         </tbody>
       </table>
-      {openChartIdx !== null && (
-        <div className="mt-6 p-6 glass rounded-xl shadow-xl animate-fade-in">
-          <LineMovementChart
-            data={cachedRows[openChartIdx].lineMovement}
-            market={cachedRows[openChartIdx].offerType}
-            team={cachedRows[openChartIdx].home_display}
-          />
-        </div>
-      )}
+      {openChartIdx !== null && (() => {
+        const chartRow = cachedRows[openChartIdx];
+        if (
+          typeof chartRow === 'object' && chartRow !== null &&
+          'lineMovement' in chartRow && 'offerType' in chartRow && 'home_display' in chartRow
+        ) {
+          const r = chartRow as TableRow;
+          return (
+            <div className="mt-6 p-6 glass rounded-xl shadow-xl animate-fade-in">
+              <LineMovementChart
+                data={r.lineMovement}
+                market={r.offerType}
+                team={r.home_display}
+              />
+            </div>
+          );
+        }
+        return null;
+      })()}
     </div>
   );
 };

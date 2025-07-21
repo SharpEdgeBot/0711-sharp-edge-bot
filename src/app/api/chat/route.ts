@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
-import { getUserRole } from '@/lib/auth';
+import { getUserRole } from '@/lib/auth.server';
 import { canSendMessage, incrementUsage } from '@/lib/usage';
 import { getCachedPregameContext } from '@/lib/cachePregameStats';
 import { getUserRateLimit } from '@/utils/rateLimiter';
@@ -18,25 +18,23 @@ export const POST = async (request: NextRequest) => {
       return new Response(JSON.stringify({ content: 'Error: Daily message limit exceeded. Upgrade your plan for unlimited messages.' }), { status: 429 });
     }
     const body = await request.json();
-    let message = body.message;
-    let gameId = body.gameId;
+  let message = body.message;
+  const gameId = body.gameId;
     if (!message && body.content && body.role === 'user') {
       message = body.content;
     }
     if (!message) {
       return new Response(JSON.stringify({ content: 'Error: Message is required.' }), { status: 400 });
     }
-    let gameContext = null;
-    let allContexts = [];
-    let contextError = null;
+  let gameContext = null;
+  let allContexts = [];
     const lowerMsg = (message || '').toLowerCase();
     const wantsSlate = lowerMsg.includes('best bet') || lowerMsg.includes('slate') || lowerMsg.includes('all games') || lowerMsg.includes('top pick') || lowerMsg.includes('top bets');
     if (gameId) {
       try {
         gameContext = await getCachedPregameContext(gameId);
-      } catch (error) {
+      } catch {
         gameContext = null;
-        contextError = error;
       }
     } else if (wantsSlate) {
       try {
@@ -60,15 +58,14 @@ export const POST = async (request: NextRequest) => {
             if (typeof context === 'string') {
               try {
                 allContexts.push(JSON.parse(context));
-              } catch (err) {}
+              } catch {}
             } else if (typeof context === 'object' && context !== null) {
               allContexts.push(context);
             }
           }
         }
-      } catch (error) {
+      } catch {
         allContexts = [];
-        contextError = error;
       }
     }
     let systemPrompt = `You are an expert MLB betting analyst. You provide insights based on statistical analysis and predictive modeling.\n\nKey principles:\n- Focus on data-driven analysis\n- Highlight the most predictive features for each betting market\n- Consider team offensive/defensive metrics, pitcher matchups, and recent form\n- Always mention uncertainty and risk management\n- Never guarantee outcomes\n`;
@@ -94,9 +91,9 @@ export const POST = async (request: NextRequest) => {
       const content = result.text || '';
       await incrementUsage(user.id);
       return new Response(JSON.stringify({ content }), { status: 200 });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Chat API backend error:', error);
-      return new Response(JSON.stringify({ content: 'Error: ' + (error?.message || 'Unknown error') }), { status: 500 });
+      return new Response(JSON.stringify({ content: 'Error: ' + ((error as Error)?.message || 'Unknown error') }), { status: 500 });
     }
 }
 

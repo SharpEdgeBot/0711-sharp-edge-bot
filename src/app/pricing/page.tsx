@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { currentUser } from '@clerk/nextjs/server';
-import { getUserRole } from '@/lib/auth';
+import { getUserRole } from '@/lib/auth.server';
 
 export default async function PricingPage() {
   const user = await currentUser();
@@ -87,7 +87,7 @@ export default async function PricingPage() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {plans.map((plan, index) => (
+          {plans.map((plan, _index) => (
             <div 
               key={plan.name}
               className={`relative bg-white rounded-lg shadow-sm border-2 p-8 ${
@@ -168,7 +168,7 @@ export default async function PricingPage() {
                 Can I cancel anytime?
               </h3>
               <p className="text-gray-600">
-                Yes, you can cancel your subscription at any time. You'll continue to have 
+                Yes, you can cancel your subscription at any time. You&apos;ll continue to have 
                 access until the end of your current billing period.
               </p>
             </div>

@@ -1,6 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import GameCard from "../../../components/GameCard";
+import teamsData from "../../../data/mlb_teams.json";
 
 interface Game {
   id: string;
@@ -25,19 +27,65 @@ interface Game {
   awayRecord?: string;
 }
 
+interface RawGame {
+  gamePk: string;
+  gameDate: string;
+  teams: {
+    home: {
+      team: { name: string; id: number };
+      score?: number;
+      leagueRecord?: { wins: number; losses: number };
+    };
+    away: {
+      team: { name: string; id: number };
+      score?: number;
+      leagueRecord?: { wins: number; losses: number };
+    };
+  };
+  status: { abstractGameState: string };
+  linescore?: { currentInning: number };
+  venue?: { name: string };
+  probablePitchers?: {
+    home?: { fullName: string; era: number };
+    away?: { fullName: string; era: number };
+  };
+}
+
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [darkMode, setDarkMode] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    fetchGames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  // useCallback ensures fetchGames reference is stable for useEffect deps
+  // Helper to get team logo by id
+  const getLogo = (id?: number) => {
+    if (!id) return "";
+    const team = (teamsData as Array<{ id: number; logo: string }>).find(t => t.id === id);
+    return team?.logo || "";
+  };
 
-  const fetchGames = async () => {
+  // Helper to get weather for a gamePk
+  const fetchWeather = async (gamePk: string | number) => {
+    try {
+      const res = await fetch(`/api/game/${gamePk}`);
+      if (!res.ok) return undefined;
+      const data = await res.json();
+      // MLB API: weather is under gameData.weather
+      return data?.gameData?.weather || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Helper to get probable pitcher stats (ERA, WHIP, etc.)
+  const formatPitcherStats = (era?: number) => {
+    return typeof era === "number" && !isNaN(era) ? `ERA: ${era.toFixed(2)}` : undefined;
+  };
+
+  // Main fetch function
+  const fetchGames = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -46,48 +94,67 @@ export default function GamesPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch games");
       }
-      let gamesArr: any[] = [];
+      let gamesArr: RawGame[] = [];
       if (Array.isArray(data.games)) {
         gamesArr = data.games;
       } else if (Array.isArray(data)) {
         gamesArr = data;
       } else if (Array.isArray(data.dates)) {
-        gamesArr = data.dates.flatMap((d: any) => d.games || []);
+        gamesArr = data.dates.flatMap((d: { games: RawGame[] }) => d.games || []);
       }
-      const mappedGames = gamesArr.map((g: any) => ({
+      // Fetch weather for each game in parallel
+      const weatherArr = await Promise.all(gamesArr.map(g => fetchWeather(g.gamePk)));
+      const mappedGames = gamesArr.map((g, i) => ({
         id: g.gamePk,
-        date: g.gameDate || g.date,
-        homeTeam: g.teams?.home?.team?.name,
-        homeTeamId: g.teams?.home?.team?.id,
-        awayTeam: g.teams?.away?.team?.name,
-        awayTeamId: g.teams?.away?.team?.id,
-        status: g.status?.abstractGameState?.toLowerCase() || "scheduled",
-        homeScore: g.teams?.home?.score,
-        awayScore: g.teams?.away?.score,
+        date: g.gameDate,
+        homeTeam: g.teams.home.team.name,
+        homeTeamId: g.teams.home.team.id,
+        awayTeam: g.teams.away.team.name,
+        awayTeamId: g.teams.away.team.id,
+        status: g.status.abstractGameState.toLowerCase() as "scheduled" | "live" | "final",
+        homeScore: g.teams.home.score,
+        awayScore: g.teams.away.score,
         inning: g.linescore?.currentInning ? `Inning ${g.linescore.currentInning}` : undefined,
-        stadium: g.venue?.name,
+        stadium: g.venue?.name || "",
         startTime: g.gameDate ? new Date(g.gameDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        homeProbablePitcher: g.probablePitchers?.home?.fullName ?? "",
-        homeProbablePitcherEra: g.probablePitchers?.home?.era ?? "",
-        awayProbablePitcher: g.probablePitchers?.away?.fullName ?? "",
-        awayProbablePitcherEra: g.probablePitchers?.away?.era ?? "",
-        homeRecord: g.teams?.home?.leagueRecord ? `${g.teams.home.leagueRecord.wins}-${g.teams.home.leagueRecord.losses}` : "",
-        awayRecord: g.teams?.away?.leagueRecord ? `${g.teams.away.leagueRecord.wins}-${g.teams.away.leagueRecord.losses}` : "",
+        homeLogo: getLogo(g.teams.home.team.id),
+        awayLogo: getLogo(g.teams.away.team.id),
+        homeProbablePitcher: g.probablePitchers?.home?.fullName || "",
+        homeProbablePitcherEra: g.probablePitchers?.home?.era || undefined,
+        awayProbablePitcher: g.probablePitchers?.away?.fullName || "",
+        awayProbablePitcherEra: g.probablePitchers?.away?.era || undefined,
+        homeRecord: g.teams.home.leagueRecord ? `${g.teams.home.leagueRecord.wins}-${g.teams.home.leagueRecord.losses}` : "",
+        awayRecord: g.teams.away.leagueRecord ? `${g.teams.away.leagueRecord.wins}-${g.teams.away.leagueRecord.losses}` : "",
+        weather: weatherArr[i],
       }));
       setGames(mappedGames);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+
+  // Poll for live updates every 30 seconds
+  useEffect(() => {
+    fetchGames();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(fetchGames, 30000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [selectedDate, fetchGames]);
+
+
 
   const formatTime = (time: string) => time || "";
 
   return (
     <div className="min-h-screen bg-[var(--background)] py-8 px-4 text-[var(--foreground)] font-sans">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold gradient-text mb-2">📅 Today's Games</h1>
+        <h1 className="text-2xl font-bold gradient-text mb-2">📅 Today&apos;s Games</h1>
         <p className="text-body mb-4">View MLB game schedules and scores</p>
         <div className="flex items-center gap-4 mt-4 mb-8">
           <input
@@ -124,36 +191,33 @@ export default function GamesPage() {
         ) : games.length === 0 ? (
           <div className="glass rounded-xl shadow-xl p-8">
             <div className="flex items-center justify-center">
-              <span className="mr-2">�</span>
+              <span className="mr-2">📭</span>
               <p className="text-body">No MLB games scheduled for {new Date(selectedDate).toLocaleDateString()}</p>
             </div>
           </div>
         ) : (
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             {games.map((game) => (
-              <div key={game.id} className="modern-card hover:shadow-2xl transition-shadow">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xl font-bold gradient-text drop-shadow-lg">{game.awayTeam}</span>
-                    <span className="mx-2 text-lg">@</span>
-                    <span className="text-xl font-bold gradient-text drop-shadow-lg">{game.homeTeam}</span>
-                  </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-muted-foreground">{game.awayRecord}</span>
-                    <span className="text-sm font-semibold text-muted-foreground">{game.homeRecord}</span>
-                  </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-muted-foreground">{game.awayProbablePitcher ? `${game.awayProbablePitcher} (ERA: ${game.awayProbablePitcherEra})` : ""}</span>
-                    <span className="text-sm font-semibold text-muted-foreground">{game.homeProbablePitcher ? `${game.homeProbablePitcher} (ERA: ${game.homeProbablePitcherEra})` : ""}</span>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    <div>{formatTime(game.startTime)}</div>
-                    <div>{game.stadium}</div>
-                    <div>{game.inning}</div>
-                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-[var(--accent-blue)] text-[var(--background)]">{game.status.toUpperCase()}</span>
-                  </div>
-                </div>
-              </div>
+              <GameCard
+                key={game.id}
+                homeTeam={game.homeTeam}
+                homeLogo={game.homeLogo || ""}
+                homeRecord={game.homeRecord}
+                homeProbablePitcher={game.homeProbablePitcher}
+                homeProbablePitcherStats={formatPitcherStats(game.homeProbablePitcherEra)}
+                awayTeam={game.awayTeam}
+                awayLogo={game.awayLogo || ""}
+                awayRecord={game.awayRecord}
+                awayProbablePitcher={game.awayProbablePitcher}
+                awayProbablePitcherStats={formatPitcherStats(game.awayProbablePitcherEra)}
+                startTime={game.startTime}
+                stadium={game.stadium}
+                weather={game.weather}
+                status={game.status}
+                inning={game.inning}
+                homeScore={game.homeScore}
+                awayScore={game.awayScore}
+              />
             ))}
           </div>
         )}
@@ -163,14 +227,14 @@ export default function GamesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link href="/dashboard/lines">
             <div className="modern-card hover:scale-105 transition-transform">
-              <div className="text-2xl mb-2 text-[var(--accent-blue)]">�</div>
+              <div className="text-2xl mb-2 text-[var(--accent-blue)]">📈</div>
               <div className="font-medium gradient-text">Betting Lines</div>
               <div className="text-body">View current odds</div>
             </div>
           </Link>
           <Link href="/dashboard/projections">
             <div className="modern-card hover:scale-105 transition-transform">
-              <div className="text-2xl mb-2 text-[var(--accent-blue)]">�</div>
+              <div className="text-2xl mb-2 text-[var(--accent-blue)]">📊</div>
               <div className="font-medium gradient-text">Projections</div>
               <div className="text-body">See model predictions</div>
             </div>

@@ -1,4 +1,4 @@
-import { GameContext, MLBScheduleResponse } from '@/types';
+
 
 const MLB_API_BASE = process.env.MLB_API_BASE_URL || 'https://statsapi.mlb.com/api/v1';
 
@@ -50,7 +50,7 @@ export async function fetchMLBSchedule(
   startDate: string,
   endDate: string,
   teamId?: number
-): Promise<MLBScheduleResponse> {
+): Promise<unknown> {
   const params = new URLSearchParams({
     sportId: '1',
     startDate,
@@ -97,7 +97,7 @@ export async function fetchPitcherStats(personId: number, season = 2025) {
 export async function fetchBatterVsPitcher(gamePk: number) {
   // This would be a more complex query combining multiple API calls
   // to get batter vs pitcher historical data
-  const game = await fetchMLBGame(gamePk);
+  const _game = await fetchMLBGame(gamePk);
   // Implementation would involve looking up historical matchups
   return {};
 }
@@ -107,7 +107,7 @@ export async function fetchRecentForm(teamId: number, games = 10) {
   const startDate = new Date(Date.now() - (games * 24 * 60 * 60 * 1000))
     .toISOString().split('T')[0];
   
-  const schedule = await fetchMLBSchedule(startDate, endDate, teamId);
+  const _schedule = await fetchMLBSchedule(startDate, endDate, teamId);
   
   // Process recent games to calculate form stats
   return {
@@ -126,7 +126,7 @@ export async function fetchRecentForm(teamId: number, games = 10) {
   };
 }
 
-export async function fetchHeadToHead(homeTeamId: number, awayTeamId: number) {
+export async function fetchHeadToHead(_homeTeamId: number, _awayTeamId: number) {
   // Implementation would involve historical matchup analysis
   return {
     games_played: 0,

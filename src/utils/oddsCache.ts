@@ -1,5 +1,5 @@
 // src/utils/oddsCache.ts
-export function getCachedOdds(gameId: string): any | null {
+export function getCachedOdds(gameId: string): unknown | null {
   if (typeof window === 'undefined') return null;
   const cached = localStorage.getItem(`odds_${gameId}`);
   if (!cached) return null;
@@ -12,7 +12,7 @@ export function getCachedOdds(gameId: string): any | null {
   }
 }
 
-export function setCachedOdds(gameId: string, data: any, ttlHours = 6): void {
+export function setCachedOdds(gameId: string, data: unknown, ttlHours = 6): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(
     `odds_${gameId}`,

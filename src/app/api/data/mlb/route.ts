@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
             endDate,
             teamId ? parseInt(teamId) : undefined
           );
-        } catch (apiError) {
-          const details = typeof apiError === 'object' && apiError !== null && 'message' in apiError ? (apiError as any).message : String(apiError);
+        } catch (apiError: unknown) {
+          const details = typeof apiError === 'object' && apiError !== null && 'message' in apiError ? (apiError as Error).message : String(apiError);
           console.error('MLB API fetchMLBSchedule error:', details);
           return NextResponse.json(
             { error: 'Upstream MLB API error', details },
@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
         let game;
         try {
           game = await fetchMLBGame(parseInt(gamePk));
-        } catch (apiError) {
-          const details = typeof apiError === 'object' && apiError !== null && 'message' in apiError ? (apiError as any).message : String(apiError);
+        } catch (apiError: unknown) {
+          const details = typeof apiError === 'object' && apiError !== null && 'message' in apiError ? (apiError as Error).message : String(apiError);
           console.error('MLB API fetchMLBGame error:', details);
           return NextResponse.json(
             { error: 'Upstream MLB API error', details },
@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error) {
-    const details = typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error);
+  } catch (error: unknown) {
+    const details = typeof error === 'object' && error !== null && 'message' in error ? (error as Error).message : String(error);
     console.error('MLB API route error:', details);
     return NextResponse.json(
       { error: 'Failed to fetch MLB data', details },

@@ -12,30 +12,30 @@ export async function GET() {
     if (!apiKey) throw new Error('Missing Optimal-Bet API key');
       const result = await cachePregameStats({ date, season, apiKey });
   return NextResponse.json({ status: 'ok', result });
-  } catch (error) {
-      // Enhanced error logging with type guard
-      let errorMessage = 'Unknown error';
-      let errorStack = undefined;
-      if (typeof error === 'object' && error !== null) {
-        if ('message' in error && typeof (error as any).message === 'string') {
-          errorMessage = (error as any).message;
-        } else {
-          errorMessage = JSON.stringify(error);
-        }
-        if ('stack' in error && typeof (error as any).stack === 'string') {
-          errorStack = (error as any).stack;
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error;
+  } catch (error: unknown) {
+    // Enhanced error logging with type guard
+    let errorMessage = 'Unknown error';
+    let errorStack = undefined;
+    if (typeof error === 'object' && error !== null) {
+      if ('message' in error && typeof (error as Error).message === 'string') {
+        errorMessage = (error as Error).message;
+      } else {
+        errorMessage = JSON.stringify(error);
       }
-      console.error('cachePregameStats API error:', {
-        message: errorMessage,
-        stack: errorStack,
-        error
-      });
-      return NextResponse.json(
-        { status: 'error', error: errorMessage, stack: errorStack, details: error },
-        { status: 500 }
-      );
+      if ('stack' in error && typeof (error as Error).stack === 'string') {
+        errorStack = (error as Error).stack;
+      }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    console.error('cachePregameStats API error:', {
+      message: errorMessage,
+      stack: errorStack,
+      error
+    });
+    return NextResponse.json(
+      { status: 'error', error: errorMessage, stack: errorStack, details: error },
+      { status: 500 }
+    );
   }
 }

@@ -4,34 +4,81 @@ import { fetchMLBSchedule } from '../../lib/mlbApi';
 
 const LiveScoreTicker: React.FC = () => {
   const [games, setGames] = useState<Array<{ home: string; away: string; score: string; status: string }>>([]);
+  const tickerRef = React.useRef<HTMLDivElement>(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
 
   useEffect(() => {
     async function loadScores() {
       const today = new Date().toISOString().split('T')[0];
       const schedule = await fetchMLBSchedule(today, today);
       const gameList: Array<{ home: string; away: string; score: string; status: string }> = [];
-      (schedule.dates || []).forEach((dateObj: any) => {
-        (dateObj.games || []).forEach((g: any) => {
-          gameList.push({
-            home: g.teams?.home?.team?.name || '',
-            away: g.teams?.away?.team?.name || '',
-            score: `${g.teams?.home?.score ?? 0}-${g.teams?.away?.score ?? 0}`,
-            status: g.status?.detailedState || '',
-          });
+      if (schedule && typeof schedule === 'object' && 'dates' in schedule && Array.isArray((schedule as { dates?: unknown[] }).dates)) {
+        ((schedule as { dates?: unknown[] }).dates || []).forEach((dateObj: unknown) => {
+        if (!dateObj || typeof dateObj !== 'object' || !('games' in dateObj)) return;
+        const games = (dateObj as { games?: unknown[] }).games || [];
+        games.forEach((g: unknown) => {
+          if (
+            typeof g === 'object' && g !== null &&
+            'teams' in g && typeof (g as { teams?: unknown }).teams === 'object' &&
+            'status' in g && typeof (g as { status?: unknown }).status === 'object'
+          ) {
+            const teamsObj = (g as { teams: unknown }).teams;
+            const statusObj = (g as { status: unknown }).status;
+            // Type guard for teams
+            if (
+              typeof teamsObj === 'object' && teamsObj !== null &&
+              'home' in teamsObj && 'away' in teamsObj
+            ) {
+              const teams = teamsObj as { home?: { team?: { name?: string }, score?: number }, away?: { team?: { name?: string }, score?: number } };
+              const status = statusObj as { detailedState?: string };
+              gameList.push({
+                home: teams.home?.team?.name || '',
+                away: teams.away?.team?.name || '',
+                score: `${teams.home?.score ?? 0}-${teams.away?.score ?? 0}`,
+                status: status.detailedState || '',
+              });
+            }
+          }
         });
       });
+      }
       setGames(gameList);
     }
     loadScores();
   }, []);
 
+  useEffect(() => {
+    if (tickerRef.current) {
+      setScrollWidth(tickerRef.current.scrollWidth);
+    }
+  }, [games]);
+
+  // Auto-scroll effect
+  useEffect(() => {
+    if (!tickerRef.current || games.length === 0) return;
+    let frame: number;
+    let pos = 0;
+    const speed = 1; // px per frame
+    const scroll = () => {
+      if (!tickerRef.current) return;
+      pos += speed;
+      if (pos > scrollWidth) pos = 0;
+      tickerRef.current.scrollLeft = pos;
+      frame = requestAnimationFrame(scroll);
+    };
+    frame = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(frame);
+  }, [scrollWidth, games]);
+
   return (
     <motion.div
+      ref={tickerRef}
       className="w-full bg-gradient-to-r from-[#23272f] via-[#1a1a1a] to-[#23272f] py-2 px-4 flex items-center gap-6 overflow-x-auto whitespace-nowrap shadow-md border-b border-[#23272f]"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 120 }}
       aria-label="Live Score Ticker"
+      style={{ scrollBehavior: 'auto' }}
     >
       {games.length === 0 ? (
         <span className="text-gray-400 text-sm">No MLB games today.</span>

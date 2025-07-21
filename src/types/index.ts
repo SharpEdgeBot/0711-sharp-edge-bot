@@ -1,5 +1,12 @@
 // Core MLB and betting data types
 
+// Utility types for flexible API responses
+export type ApiResponse<T = unknown> = {
+  [key: string]: T;
+};
+
+export type FlexibleRecord = Record<string, unknown>;
+
 export interface GameContext {
   game_id: string;
   game_date: string;
@@ -7,7 +14,7 @@ export interface GameContext {
   venue: string;
   home_team: TeamStats;
   away_team: TeamStats;
-  odds: Record<string, any>; // Pinnacle odds markets
+  odds: import('@/lib/pinnacleOddsTransform').NormalizedOdds[];
   pitcher_matchup: {
     home_pitcher: PitcherStats;
     away_pitcher: PitcherStats;
@@ -18,9 +25,9 @@ export interface GameContext {
     away: FormStats;
   };
   head_to_head: H2HStats;
-  weather?: any;
-  venue_info?: any;
-  status?: any;
+  weather?: Record<string, string>; // Updated weather type
+  venue_info?: Record<string, string>; // Updated venue_info type
+  status?: string; // Updated status type
 }
 
 export interface TeamStats {
@@ -122,6 +129,15 @@ export interface PlayerProp {
   timestamp: string;
 }
 
+export interface PinnacleMarket {
+  market_id: string;
+  market_type: string;
+  odds: number;
+  line?: number;
+  sportsbook: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
 // User & Subscription Types
 export type SubscriptionTier = 'free' | 'pro' | 'vip';
 
@@ -141,9 +157,69 @@ export interface ChatMessage {
   game_context?: GameContext;
 }
 
-// API Response Types
-// ...existing code...
-// ...existing code...
+
+// OptimalBet API Types
+export interface OptimalBetEvent {
+  event_id: string;
+  league: string;
+  season: string;
+  date: string;
+  home_team: string;
+  away_team: string;
+  venue?: string;
+  status?: string;
+  [key: string]: string | number | boolean | undefined; // Updated flexible type
+}
+
+export interface OptimalBetMarket {
+  market_id: string;
+  event_id: string;
+  market_type: string;
+  sportsbook: string;
+  line: number;
+  odds: number;
+  is_mainline?: boolean;
+  altLine?: boolean;
+  [key: string]: string | number | boolean | undefined; // Updated flexible type
+}
+
+export interface OptimalBetOffer {
+  offer_id: string;
+  is_mainline: boolean;
+  altLine?: boolean;
+  odds: number;
+  sportsbook: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface OptimalBetGameline {
+  line_id: string;
+  is_mainline: boolean;
+  altLine?: boolean;
+  market_type: string;
+  odds: number;
+  sportsbook: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface OptimalBetProp {
+  prop_id: string;
+  player_id: string;
+  player_name: string;
+  prop_type: string;
+  line: number;
+  over_odds: number;
+  under_odds: number;
+  sportsbook: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface OptimalBetSportsbook {
+  sportsbook_id: string;
+  name: string;
+  url: string;
+  [key: string]: string | number | boolean | undefined;
+}
 
 // Feature Analysis Types
 export interface FeatureImportance {

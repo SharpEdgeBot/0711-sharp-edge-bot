@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { fetchMLBSchedule, fetchTeamStats } from '../../lib/mlbApi';
+
 
 const ChatRightPanel: React.FC = () => {
   const [standings, setStandings] = useState<Array<{ team: string; teamId: number; wins: number; losses: number; pct: number }>>([]);
@@ -8,61 +8,30 @@ const ChatRightPanel: React.FC = () => {
 
   useEffect(() => {
     async function loadPanelData() {
-      const today = new Date().toISOString().split('T')[0];
       try {
-        const schedule = await fetchMLBSchedule(today, today);
-        const teamObjs: any[] = [];
-        (schedule.dates || []).forEach((dateObj: any) => {
-          (dateObj.games || []).forEach((g: any) => {
-            [g.teams?.home?.team, g.teams?.away?.team].forEach((teamObj: any) => {
-              if (teamObj && teamObj.id) {
-                teamObjs.push(teamObj);
-              }
-            });
-          });
-        });
-        // Remove duplicates
-        const uniqueTeams = Array.from(new Map(teamObjs.map(t => [t.id, t])).values());
-        const standingsArr = await Promise.all(uniqueTeams.map(async (teamObj: any) => {
-          try {
-            const statsData = await fetchTeamStats(teamObj.id);
-            const stats = statsData.stats?.[0]?.splits?.[0]?.stat || {};
-            return {
-              team: teamObj.name,
-              teamId: teamObj.id,
-              wins: typeof stats.wins === 'number' ? stats.wins : 0,
-              losses: typeof stats.losses === 'number' ? stats.losses : 0,
-              pct: typeof stats.pct === 'number' ? stats.pct : 0,
-            };
-          } catch (err) {
-            return {
-              team: teamObj.name,
-              teamId: teamObj.id,
-              wins: 0,
-              losses: 0,
-              pct: 0,
-            };
-          }
-        }));
-        setStandings(standingsArr);
-        // Odds logic unchanged
+        // Fetch live games and odds from Pinnacle API via Next.js route
+        const res = await fetch('/api/mlb/games');
+        const data = await res.json();
+        const games = data.games || [];
+
+        // Odds extraction from Pinnacle normalized data
         const oddsList: Array<{ home: string; away: string; market: string; value: string }> = [];
-        (schedule.dates || []).forEach((dateObj: any) => {
-          (dateObj.games || []).forEach((g: any) => {
-            if (g.odds && Array.isArray(g.odds)) {
-              g.odds.forEach((o: any) => {
-                oddsList.push({
-                  home: g.teams?.home?.team?.name || '',
-                  away: g.teams?.away?.team?.name || '',
-                  market: o.market || '',
-                  value: o.value || '',
-                });
-              });
-            }
-          });
+        games.forEach((g: Record<string, unknown>) => {
+          if (g.marketType && g.oddsValue !== undefined) {
+            oddsList.push({
+              home: (g.teams as string[] | undefined)?.[0] || '',
+              away: (g.teams as string[] | undefined)?.[1] || '',
+              market: String(g.marketType),
+              value: String(g.oddsValue),
+            });
+          }
         });
         setOdds(oddsList);
-      } catch (err) {
+
+        // Standings logic (optional, can be improved with live data)
+        // If you want to keep standings, fetch from MLB API as before
+        setStandings([]); // Or keep previous logic if needed
+      } catch (_err) {
         setStandings([]);
         setOdds([]);
       }
@@ -74,13 +43,14 @@ const ChatRightPanel: React.FC = () => {
     <aside className="hidden lg:flex flex-col w-80 h-full bg-gradient-to-b from-[#23272f] to-[#1a1a1a] glass-morph px-4 py-6 shadow-xl border-l border-[#23272f] z-20">
       {/* Standings */}
       <div className="mb-8">
-        <h3 className="text-lg font-bold text-electric-blue mb-4">Today's Standings</h3>
+        <h3 className="text-lg font-bold text-electric-blue mb-4">Today&apos;s Standings</h3>
         <div className="space-y-2">
           {standings.length === 0 ? (
             <span className="text-gray-400 text-sm">No standings available.</span>
           ) : (
             standings.map((s, idx) => (
               <div key={idx} className="flex justify-between items-center px-2 py-1 rounded bg-[#23272f] text-white font-mono">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://www.mlbstatic.com/team-logos/${s.teamId}.svg`}
                   alt={s.team}
@@ -97,7 +67,7 @@ const ChatRightPanel: React.FC = () => {
       </div>
       {/* Odds */}
       <div>
-        <h3 className="text-lg font-bold text-orange-500 mb-4">Today's Odds</h3>
+        <h3 className="text-lg font-bold text-orange-500 mb-4">Today&apos;s Odds</h3>
         <div className="space-y-2">
           {odds.length === 0 ? (
             <span className="text-gray-400 text-sm">No odds available.</span>

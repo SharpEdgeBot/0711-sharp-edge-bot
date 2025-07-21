@@ -36,10 +36,10 @@ export interface GameContext {
   awayTeam: TeamStats;
   homePitcher: PlayerStats;
   awayPitcher: PlayerStats;
-  odds: Record<string, any>; // Pinnacle odds markets
-  weather?: any;
-  venue?: any;
-  status?: any;
+  odds: Record<string, unknown>; // Pinnacle odds markets
+  weather?: unknown;
+  venue?: unknown;
+  status?: unknown;
 }
 
 // Utility: Fetch MLB schedule for today
@@ -51,7 +51,7 @@ export async function fetchMLBSchedule(date: string) {
     return { dates: [] };
   }
   const data = await res.json();
-  return (data && typeof data === 'object') ? data as { dates?: any[] } : { dates: [] };
+  return (data && typeof data === 'object') ? data as { dates?: unknown[] } : { dates: [] };
 }
 
 // Utility: Fetch team stats
@@ -83,30 +83,9 @@ export async function fetchProbablePitchers(gamePk: number) {
   }
 }
 
-// Utility: Fetch betting odds from Optimal-Bet.com
-export async function fetchBettingLines(eventId: string, apiKey: string) {
-  const url = `https://api.optimal-bet.com/v1/gamelines/MLB?eventId=${eventId}`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        accept: 'application/json',
-        'X-API-Key': apiKey,
-      },
-    });
-    if (!res.ok) {
-      if (res.status === 400) {
-        console.error(`OptimalBet odds 400 for eventId ${eventId}`);
-        return {};
-      }
-      throw new Error(`OptimalBet odds error: ${res.status}`);
-    }
-    const data = await res.json();
-    return (data && typeof data === 'object') ? data : {};
-  } catch (err) {
-    console.error(`OptimalBet odds fetch error for eventId ${eventId}:`, err);
-    return {};
-  }
-}
+
+// Utility: Fetch Pinnacle odds (already implemented in /lib/pinnacleApi and /lib/pinnacleOddsTransform)
+// Odds should be fetched via fetchPinnacleOdds and transformPinnacleOdds only.
 
 // Main: Build standardized game context
 export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId, season, apiKey }: {
@@ -117,10 +96,10 @@ export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId
   season: number;
   apiKey: string;
 }): Promise<GameContext> {
-  let homeStatsRaw = {};
-  let awayStatsRaw = {};
-  let homeStatsArr: any[] = [];
-  let awayStatsArr: any[] = [];
+  let homeStatsRaw: unknown = {};
+  let awayStatsRaw: unknown = {};
+  let homeStatsArr: unknown[] = [];
+  let awayStatsArr: unknown[] = [];
   let homeTeam: TeamStats = { teamId: homeTeamId, name: '', wOBA: 0, OPS: 0, runsPerGame: 0, runsAllowedPerGame: 0, defensiveEfficiency: 0 };
   let awayTeam: TeamStats = { teamId: awayTeamId, name: '', wOBA: 0, OPS: 0, runsPerGame: 0, runsAllowedPerGame: 0, defensiveEfficiency: 0 };
   try {
@@ -128,37 +107,71 @@ export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId
       fetchTeamStats(homeTeamId, season),
       fetchTeamStats(awayTeamId, season),
     ]);
-    homeStatsArr = Array.isArray((homeStatsRaw as any)?.stats) ? (homeStatsRaw as any).stats : [];
-    awayStatsArr = Array.isArray((awayStatsRaw as any)?.stats) ? (awayStatsRaw as any).stats : [];
+    homeStatsArr = Array.isArray((homeStatsRaw as { stats?: unknown[] })?.stats)
+      ? ((homeStatsRaw as { stats?: unknown[] }).stats ?? [])
+      : [];
+    awayStatsArr = Array.isArray((awayStatsRaw as { stats?: unknown[] })?.stats)
+      ? ((awayStatsRaw as { stats?: unknown[] }).stats ?? [])
+      : [];
+    const getTeamName = (arr: unknown[]): string =>
+      arr[0] && typeof arr[0] === 'object' && 'team' in arr[0] && typeof (arr[0] as { team?: { name?: string } }).team?.name === 'string'
+        ? (arr[0] as { team?: { name?: string } }).team!.name!
+        : '';
+    type StatSplit = { stat?: Record<string, unknown> };
+    const getStat = (arr: unknown[], key: string): number => {
+      if (
+        arr[0] && typeof arr[0] === 'object' &&
+        'splits' in arr[0] &&
+        Array.isArray((arr[0] as { splits?: StatSplit[] }).splits) &&
+        (arr[0] as { splits?: StatSplit[] }).splits![0]?.stat &&
+        typeof (arr[0] as { splits?: StatSplit[] }).splits![0].stat === 'object' &&
+        key in (arr[0] as { splits?: StatSplit[] }).splits![0].stat!
+      ) {
+        return Number((arr[0] as { splits?: StatSplit[] }).splits![0].stat![key]);
+      }
+      return 0;
+    };
     homeTeam = {
       teamId: homeTeamId,
-      name: homeStatsArr[0]?.team?.name ?? '',
-      wOBA: homeStatsArr[0]?.splits?.[0]?.stat?.wOBA ?? 0,
-      OPS: homeStatsArr[0]?.splits?.[0]?.stat?.ops ?? 0,
-      runsPerGame: homeStatsArr[0]?.splits?.[0]?.stat?.runsPerGame ?? 0,
-      runsAllowedPerGame: homeStatsArr[0]?.splits?.[0]?.stat?.runsAllowedPerGame ?? 0,
-      defensiveEfficiency: homeStatsArr[0]?.splits?.[0]?.stat?.defensiveEfficiency ?? 0,
+      name: getTeamName(homeStatsArr),
+      wOBA: getStat(homeStatsArr, 'wOBA'),
+      OPS: getStat(homeStatsArr, 'ops'),
+      runsPerGame: getStat(homeStatsArr, 'runsPerGame'),
+      runsAllowedPerGame: getStat(homeStatsArr, 'runsAllowedPerGame'),
+      defensiveEfficiency: getStat(homeStatsArr, 'defensiveEfficiency'),
     };
     awayTeam = {
       teamId: awayTeamId,
-      name: awayStatsArr[0]?.team?.name ?? '',
-      wOBA: awayStatsArr[0]?.splits?.[0]?.stat?.wOBA ?? 0,
-      OPS: awayStatsArr[0]?.splits?.[0]?.stat?.ops ?? 0,
-      runsPerGame: awayStatsArr[0]?.splits?.[0]?.stat?.runsPerGame ?? 0,
-      runsAllowedPerGame: awayStatsArr[0]?.splits?.[0]?.stat?.runsAllowedPerGame ?? 0,
-      defensiveEfficiency: awayStatsArr[0]?.splits?.[0]?.stat?.defensiveEfficiency ?? 0,
+      name: getTeamName(awayStatsArr),
+      wOBA: getStat(awayStatsArr, 'wOBA'),
+      OPS: getStat(awayStatsArr, 'ops'),
+      runsPerGame: getStat(awayStatsArr, 'runsPerGame'),
+      runsAllowedPerGame: getStat(awayStatsArr, 'runsAllowedPerGame'),
+      defensiveEfficiency: getStat(awayStatsArr, 'defensiveEfficiency'),
     };
   } catch (err) {
     // Log and continue with defaults
     console.error(`Team stats error for gamePk ${gamePk}:`, err);
   }
-  let boxscore: any = {};
-  let teamsObj: any = { home: { probablePitcher: {} }, away: { probablePitcher: {} } };
+let boxscore: unknown = {};
+interface ProbablePitcher {
+  id?: number;
+  fullName?: string;
+  era?: number;
+  whip?: number;
+  fip?: number;
+  k9?: number;
+}
+interface TeamsObj {
+  home?: { probablePitcher?: ProbablePitcher };
+  away?: { probablePitcher?: ProbablePitcher };
+}
+let teamsObj: TeamsObj = { home: { probablePitcher: {} }, away: { probablePitcher: {} } };
   let homePitcher: PlayerStats = { playerId: 0, name: '', ERA: 0, WHIP: 0, FIP: 0, K9: 0 };
   let awayPitcher: PlayerStats = { playerId: 0, name: '', ERA: 0, WHIP: 0, FIP: 0, K9: 0 };
   try {
     boxscore = await fetchProbablePitchers(gamePk);
-    teamsObj = (boxscore as any)?.teams ?? { home: { probablePitcher: {} }, away: { probablePitcher: {} } };
+    teamsObj = (boxscore as { teams?: TeamsObj })?.teams ?? { home: { probablePitcher: {} }, away: { probablePitcher: {} } };
     homePitcher = {
       playerId: teamsObj.home?.probablePitcher?.id ?? 0,
       name: teamsObj.home?.probablePitcher?.fullName ?? '',
@@ -179,25 +192,11 @@ export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId
     // Log and continue with defaults
     console.error(`Boxscore error for gamePk ${gamePk}:`, err);
   }
-  let oddsRaw: any = {};
-  let oddsArr: any[] = [];
-  let bettingLines: BettingLine[] = [];
-  try {
-    oddsRaw = await fetchBettingLines(eventId, apiKey);
-    oddsArr = Array.isArray((oddsRaw as any)?.markets) ? (oddsRaw as any).markets : [];
-    bettingLines = oddsArr.map((m: any) => ({
-      marketType: m.marketType,
-      bookmaker: m.bookmaker,
-      lineValue: m.lineValue,
-      payout: m.payout,
-      lastUpdate: m.lastUpdate,
-    }));
-  } catch (err) {
-    // Log and continue with empty bettingLines
-    console.error(`Betting lines error for gamePk ${gamePk}, eventId ${eventId}:`, err);
-    bettingLines = [];
-  }
-  const gameDataObj = (boxscore as any)?.gameData ?? { datetime: { dateTime: '' } };
+let oddsRaw: unknown = {};
+let oddsArr: unknown[] = [];
+let _bettingLines: BettingLine[] = [];
+  // Odds logic should use Pinnacle odds only. Remove OptimalBet logic.
+  const gameDataObj = (boxscore as { gameData?: { datetime?: { dateTime?: string } } })?.gameData ?? { datetime: { dateTime: '' } };
   return {
     gamePk,
     eventId,
@@ -206,6 +205,6 @@ export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId
     awayTeam,
     homePitcher,
     awayPitcher,
-    odds: oddsArr,
+    odds: { pinnacle: _bettingLines },
   };
 }

@@ -6,19 +6,23 @@ describe('API Route Integration', () => {
   it('/api/data/mlb should return valid response', async () => {
     const res = await fetch(`${baseUrl}/api/data/mlb?action=schedule`);
     expect(res.status).toBe(200);
-    const data = await res.json() as any;
+    const data = await res.json() as unknown;
     console.log('MLB API Response:', JSON.stringify(data, null, 2));
     expect(data).toBeDefined();
-    expect(data.dates || data.games).toBeDefined();
+    if (typeof data === 'object' && data !== null) {
+      expect('dates' in data || 'games' in data).toBe(true);
+    }
   });
 
   it('/api/data/optimal should return valid response', async () => {
     const res = await fetch(`${baseUrl}/api/data/optimal?action=events`);
     expect(res.status).toBe(200);
-    const data = await res.json() as any;
+    const data = await res.json() as unknown;
     console.log('OptimalBet API Response:', JSON.stringify(data, null, 2));
     expect(data).toBeDefined();
-    expect(data.events).toBeDefined();
+    if (typeof data === 'object' && data !== null) {
+      expect('events' in data).toBe(true);
+    }
   });
 
   it('/api/chat should return valid response', async () => {
@@ -28,10 +32,12 @@ describe('API Route Integration', () => {
       body: JSON.stringify({ message: 'Test message' })
     });
     expect(res.status).toBe(200);
-    const data = await res.json() as any;
+    const data = await res.json() as unknown;
     console.log('Chat API Response:', JSON.stringify(data, null, 2));
     expect(data).toBeDefined();
-    expect(data.response).toBeDefined();
+    if (typeof data === 'object' && data !== null) {
+      expect('response' in data).toBe(true);
+    }
   });
 
   it('/api/stripe/webhook should reject GET', async () => {

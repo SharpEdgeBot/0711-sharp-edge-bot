@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
 
 interface ChatSidebarProps {
@@ -14,7 +15,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ history, favorites, onSelectH
     <aside className="hidden md:flex flex-col w-64 h-full bg-gradient-to-b from-[#23272f] to-[#1a1a1a] glass-morph px-4 py-6 shadow-xl border-r border-[#23272f]">
       {/* Logo & Title */}
       <div className="flex items-center mb-8">
-        <img src={user?.imageUrl || '/window.svg'} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
+        <Image src={user?.imageUrl || '/window.svg'} alt="Logo" width={32} height={32} className="w-8 h-8 mr-2 rounded-full" />
   <span className="text-xl font-bold text-electric-blue">{user?.fullName || 'MLB Betting Assistant'}</span>
       </div>
       {/* Chat History */}
@@ -49,7 +50,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ history, favorites, onSelectH
               className="w-full flex items-center gap-2 py-2 px-3 rounded-lg bg-electric-blue text-[#1a1a1a] font-semibold shadow-md hover:bg-[#00b3cc] transition-colors mb-2"
               onClick={() => onSelectFavorite(fav.id)}
             >
-              {fav.logoUrl && <img src={fav.logoUrl} alt={fav.name} className="w-6 h-6 rounded-full" />}
+              {fav.logoUrl && <Image src={fav.logoUrl} alt={fav.name} width={24} height={24} className="w-6 h-6 rounded-full" />}
               {fav.name}
             </button>
           ))

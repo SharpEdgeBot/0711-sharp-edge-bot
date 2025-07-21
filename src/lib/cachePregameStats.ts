@@ -1,6 +1,6 @@
 // src/lib/cachePregameStats.ts
 import { Redis } from '@upstash/redis';
-import { fetchMLBSchedule, buildGameContext } from './sportsData';
+import { buildGameContext } from './sportsData';
 import { fetch } from 'undici';
 
 const redis = new Redis({
@@ -15,6 +15,25 @@ export async function cachePregameStats({ date, season, apiKey }: {
   apiKey: string;
 }) {
   try {
+    // 0. Always fetch latest Pinnacle odds and hydrate cache
+    const oddsByGame: Record<string, unknown[]> = {};
+    try {
+      const { fetchPinnacleOdds } = await import('./pinnacleApi');
+      const { transformPinnacleOdds } = await import('./pinnacleOddsTransform');
+      const rawOdds = await fetchPinnacleOdds();
+      if (rawOdds) {
+        const normalizedOdds = transformPinnacleOdds(rawOdds);
+        for (const odds of normalizedOdds) {
+          // Group odds by gameId for context hydration
+          if (!oddsByGame[odds.gameId]) oddsByGame[odds.gameId] = [];
+          oddsByGame[odds.gameId].push(odds);
+        }
+      } else {
+        console.warn('No Pinnacle odds returned from fetchPinnacleOdds');
+      }
+    } catch (_err) {
+      console.error('Error fetching Pinnacle odds:', _err);
+    }
     // 1. Fetch today's MLB schedule with full hydration
     const scheduleUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}&hydrate=team,linescore,probablePitcher(note),game(content),flags,liveLookin,seriesStatus`;
     let scheduleRes, schedule;
@@ -22,19 +41,29 @@ export async function cachePregameStats({ date, season, apiKey }: {
       scheduleRes = await fetch(scheduleUrl);
       schedule = await scheduleRes.json();
       console.log('MLB schedule response:', JSON.stringify(schedule, null, 2));
-    } catch (err) {
-      console.error('Error fetching MLB schedule:', err);
-      return [{ error: 'MLB schedule fetch failed', details: String(err) }];
+    } catch (_err) {
+      console.error('Error fetching MLB schedule:', _err);
+      return [{ error: 'MLB schedule fetch failed', details: String(_err) }];
     }
     // Use type assertion for schedule
-    const datesArr = Array.isArray((schedule as any)?.dates) ? (schedule as any).dates : [];
-    let games: any[] = [];
+    const datesArr = Array.isArray((schedule as { dates?: { games?: unknown[] }[] })?.dates)
+      ? (schedule as { dates?: { games?: unknown[] }[] }).dates!
+      : [];
+    type MLBGame = {
+      gamePk: number;
+      gameInfo?: { eventId?: string };
+      teams: {
+        home: { team: { id: number; name?: string }, probablePitcher?: { fullName?: string, id?: number } };
+        away: { team: { id: number; name?: string }, probablePitcher?: { fullName?: string, id?: number } };
+      };
+    };
+    let games: MLBGame[] = [];
     for (const dateObj of datesArr) {
-      if (Array.isArray((dateObj as any).games)) {
-        games = games.concat((dateObj as any).games);
+      if (Array.isArray(dateObj.games)) {
+        games = games.concat(dateObj.games as MLBGame[]);
       }
     }
-    const results: any[] = [];
+    const results: Array<{ gamePk: number; status?: string; error?: string; details?: string }> = [];
 
     // 2. For each game, fetch /game/{gamePk}/feed/live and enrich context
     for (const game of games) {
@@ -46,9 +75,9 @@ export async function cachePregameStats({ date, season, apiKey }: {
       const awayTeamName = game.teams.away.team.name || '';
       const homeStarterName = game.teams.home.probablePitcher?.fullName || '';
       const awayStarterName = game.teams.away.probablePitcher?.fullName || '';
-      let weather = {};
-      let venue = {};
-      let status = {};
+      let weather: unknown = {};
+      let venue: unknown = {};
+      let status: unknown = {};
       try {
         // Fetch live feed for pregame enrichment
         const liveUrl = `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`;
@@ -56,16 +85,13 @@ export async function cachePregameStats({ date, season, apiKey }: {
         try {
           liveRes = await fetch(liveUrl);
           liveData = await liveRes.json();
-          console.log(`Live feed for gamePk ${gamePk}:`, JSON.stringify(liveData, null, 2));
         } catch (err) {
-          console.error(`Error fetching live feed for gamePk ${gamePk}:`, err);
           results.push({ gamePk, error: 'Live feed fetch failed', details: String(err) });
           continue;
         }
-        // Use type assertion for liveData
-        weather = (liveData as any)?.gameData?.weather || {};
-        venue = (liveData as any)?.gameData?.venue || {};
-        status = (liveData as any)?.gameData?.status || {};
+        weather = (liveData as { gameData?: { weather?: unknown } })?.gameData?.weather || {};
+        venue = (liveData as { gameData?: { venue?: unknown } })?.gameData?.venue || {};
+        status = (liveData as { gameData?: { status?: unknown } })?.gameData?.status || {};
         const context = await buildGameContext({
           gamePk,
           eventId,
@@ -84,10 +110,8 @@ export async function cachePregameStats({ date, season, apiKey }: {
           if (!pitcherObj || !pitcherName) return;
           const isMissingStats = [pitcherObj.ERA, pitcherObj.WHIP, pitcherObj.FIP, pitcherObj.K9].every(v => !v || v === 0);
           if (isMissingStats && pitcherName) {
-            // Try to get pitcherId from probablePitcher or fallback to searching by name
             let pitcherId = pitcherObj.playerId;
             if (!pitcherId && game.teams) {
-              // Try to find probablePitcher id from schedule
               const probable = [game.teams.home.probablePitcher, game.teams.away.probablePitcher].find(p => p?.fullName === pitcherName);
               if (probable?.id) pitcherId = probable.id;
             }
@@ -96,18 +120,16 @@ export async function cachePregameStats({ date, season, apiKey }: {
                 const statsUrl = `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${season}`;
                 const statsRes = await fetch(statsUrl);
                 if (statsRes.ok) {
-                  const statsData = await statsRes.json() as { stats?: Array<{ splits?: Array<{ stat?: any }> }> };
-                  const statObj = statsData?.stats?.[0]?.splits?.[0]?.stat;
-                  if (statObj) {
-                    pitcherObj.ERA = statObj.era ?? pitcherObj.ERA;
-                    pitcherObj.WHIP = statObj.whip ?? pitcherObj.WHIP;
-                    pitcherObj.FIP = statObj.fip ?? pitcherObj.FIP;
-                    pitcherObj.K9 = statObj.k9 ?? pitcherObj.K9;
+                const statsData = await statsRes.json() as { stats?: Array<{ splits?: Array<{ stat?: Record<string, unknown> }> }> };
+                const statObj = statsData?.stats?.[0]?.splits?.[0]?.stat;
+                if (statObj) {
+                  if (typeof statObj.era === 'number') pitcherObj.ERA = statObj.era;
+                  if (typeof statObj.whip === 'number') pitcherObj.WHIP = statObj.whip;
+                  if (typeof statObj.fip === 'number') pitcherObj.FIP = statObj.fip;
+                  if (typeof statObj.k9 === 'number') pitcherObj.K9 = statObj.k9;
                   }
                 }
-              } catch (err) {
-                console.error(`Error fetching fallback pitcher stats for ${pitcherName} (${pitcherId}):`, err);
-              }
+              } catch (_err) {}
             }
           }
         }
@@ -116,17 +138,20 @@ export async function cachePregameStats({ date, season, apiKey }: {
         context.weather = weather;
         context.venue = venue;
         context.status = status;
+        // Attach Pinnacle odds to context
+        const oddsArr = oddsByGame[gamePk?.toString()];
+        context.odds = Array.isArray(oddsArr) ? { pinnacle: oddsArr } : {};
         // Cache in Redis with 2 hour expiry
         await redis.set(`pregame:${gamePk}`, JSON.stringify(context), { ex: 7200 });
         results.push({ gamePk, status: 'ok' });
-      } catch (err) {
-        results.push({ gamePk, status: 'error', error: String(err) });
+      } catch (_err) {
+        results.push({ gamePk, status: 'error', error: String(_err) });
       }
     }
     return results;
-  } catch (err) {
-    console.error('Fatal error in cachePregameStats:', err);
-    return [{ error: 'Fatal error', details: String(err) }];
+  } catch (_err) {
+    console.error('Fatal error in cachePregameStats:', _err);
+    return [{ error: 'Fatal error', details: String(_err) }];
   }
 }
 
