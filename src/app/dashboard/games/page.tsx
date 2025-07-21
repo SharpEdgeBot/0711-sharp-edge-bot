@@ -25,6 +25,7 @@ interface Game {
   awayProbablePitcherEra?: number;
   homeRecord?: string;
   awayRecord?: string;
+  weather?: unknown;
 }
 
 interface RawGame {
@@ -149,7 +150,6 @@ export default function GamesPage() {
 
 
 
-  const formatTime = (time: string) => time || "";
 
   return (
     <div className="min-h-screen bg-[var(--background)] py-8 px-4 text-[var(--foreground)] font-sans">
@@ -212,7 +212,7 @@ export default function GamesPage() {
                 awayProbablePitcherStats={formatPitcherStats(game.awayProbablePitcherEra)}
                 startTime={game.startTime}
                 stadium={game.stadium}
-                weather={game.weather}
+                weather={game.weather as { condition?: string; temp?: string; wind?: string } | undefined}
                 status={game.status}
                 inning={game.inning}
                 homeScore={game.homeScore}

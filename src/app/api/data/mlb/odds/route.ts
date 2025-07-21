@@ -10,8 +10,14 @@ export async function GET() {
     }
     const oddsList = transformPinnacleOdds(rawOdds);
     return NextResponse.json(oddsList);
-  } catch (err: any) {
-    // If the error is not JSON, return a clear error
-    return NextResponse.json({ error: 'Pinnacle odds fetch failed', details: err?.message || String(err) }, { status: 500 });
+  } catch (err: unknown) {
+    let message = 'Unknown error';
+    if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+      message = (err as { message: string }).message;
+    } else if (typeof err === 'string') {
+      message = err;
+    }
+    return NextResponse.json({ error: 'Pinnacle odds fetch failed', details: message }, { status: 500 });
   }
 }
+// ...existing code...

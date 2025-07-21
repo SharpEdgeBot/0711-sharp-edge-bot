@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import mlbTeams from '@/data/mlb_teams.json';
 import { buildGameContext } from '@/utils/buildGameContext';
 
@@ -20,21 +21,49 @@ interface GameOdds {
   gamelines?: {
     offers: Offer[];
   };
+  statContext?: StatContext;
 }
 
-export default function ProbabilityDashboard() {
+interface RawOdds {
+  gameId: string;
+  teams?: string[];
+  homeTeam?: string;
+  awayTeam?: string;
+  marketType: string;
+  oddsValue: number;
+}
 
-  const [games, setGames] = useState<any[]>([]);
+interface StatContext {
+  recent_form?: {
+    home?: { last_10_games?: { wins: number; losses: number } };
+    away?: { last_10_games?: { wins: number; losses: number } };
+  };
+  pitcher_matchup?: {
+    home_pitcher?: { era?: number };
+    away_pitcher?: { era?: number };
+  };
+  home_team?: { offense?: { wOBA?: number } };
+  away_team?: { offense?: { wOBA?: number } };
+}
+
+
+export default function ProbabilityDashboard() {
+  const [games, setGames] = useState<GameOdds[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    // Fetch odds as before, but also fetch/calculate stat context for each game
-    fetch('/api/data/mlb/odds')
-      .then((res: Response) => res.json())
-      .then(async (data: any[]) => {
-        // Group by gameId
+    async function fetchProjections() {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch odds data (replace with actual fetch as needed)
+        const res = await fetch('/api/data/mlb/odds');
+        if (!res.ok) throw new Error('Failed to fetch odds');
+        const data = await res.json();
         const grouped: Record<string, GameOdds> = {};
-        data.forEach((o) => {
+        (data as unknown[]).forEach((_o) => {
+          const o = _o as RawOdds;
           const id = o.gameId;
           if (!grouped[id]) {
             grouped[id] = {
@@ -57,14 +86,14 @@ export default function ProbabilityDashboard() {
                 offerType: 'over',
                 oddsAmerican: o.oddsValue,
                 sportsbook: 'pinnacle',
-                line: parseFloat(o.marketType.split('_').pop()),
+                line: parseFloat(o.marketType.split('_').pop() || '0'),
               });
             } else if (o.marketType.startsWith('total_under')) {
               grouped[id].gamelines!.offers.push({
                 offerType: 'under',
                 oddsAmerican: o.oddsValue,
                 sportsbook: 'pinnacle',
-                line: parseFloat(o.marketType.split('_').pop()),
+                line: parseFloat(o.marketType.split('_').pop() || '0'),
               });
             }
           }
@@ -72,23 +101,23 @@ export default function ProbabilityDashboard() {
         // For each grouped game, fetch stat context and blend
         const gameArr = Object.values(grouped);
         const blendedGames = await Promise.all(gameArr.map(async (game) => {
-          // Try to get stat context (cached)
-          let statContext: any = null;
+          let statContext: StatContext | undefined = undefined;
           try {
-            statContext = await buildGameContext(game.id);
-          } catch (e) {
+            statContext = await buildGameContext(game.id) as StatContext;
+          } catch (_e) {
             // fallback: skip stat blend
           }
           return { ...game, statContext };
         }));
         setGames(blendedGames);
         setLoading(false);
-      })
-      .catch((err: unknown) => {
+      } catch (err) {
         console.error('Error fetching projections:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch projections');
         setLoading(false);
-      });
+      }
+    }
+    fetchProjections();
   }, []);
 
   // Calculate implied probability from American odds
@@ -101,44 +130,10 @@ export default function ProbabilityDashboard() {
   };
 
   // Normalize two probabilities so they sum to 1 (remove vig)
-  const normalizeProbs = (homeProb: number, awayProb: number) => {
-    const total = homeProb + awayProb;
-    if (total === 0) return [0.5, 0.5];
-    return [homeProb / total, awayProb / total];
-  };
 
-  // Calculate stat-based edge (simple: recent form, pitcher ERA, team wOBA)
-  function getStatEdge(statContext: any): [number, number] {
-    if (!statContext) return [0.5, 0.5];
-    // Example: use last 10 games win%, pitcher ERA, team wOBA
-    const homeForm = statContext.recent_form?.home?.last_10_games;
-    const awayForm = statContext.recent_form?.away?.last_10_games;
-    const homePitcher = statContext.pitcher_matchup?.home_pitcher;
-    const awayPitcher = statContext.pitcher_matchup?.away_pitcher;
-    const homeTeam = statContext.home_team;
-    const awayTeam = statContext.away_team;
-    // Win %
-    const homeWinPct = homeForm ? homeForm.wins / (homeForm.wins + homeForm.losses) : 0.5;
-    const awayWinPct = awayForm ? awayForm.wins / (awayForm.wins + awayForm.losses) : 0.5;
-    // Pitcher ERA (lower is better)
-    const homeERA = homePitcher?.era || 4.0;
-    const awayERA = awayPitcher?.era || 4.0;
-    // Team wOBA (higher is better)
-    const homeWOBA = homeTeam?.offense?.wOBA || 0.320;
-    const awayWOBA = awayTeam?.offense?.wOBA || 0.320;
-    // Simple scoring: each factor 1/3 weight
-    let homeScore = 0.33 * homeWinPct + 0.33 * (awayERA / (homeERA + awayERA)) + 0.34 * (homeWOBA / (homeWOBA + awayWOBA));
-    let awayScore = 0.33 * awayWinPct + 0.33 * (homeERA / (homeERA + awayERA)) + 0.34 * (awayWOBA / (homeWOBA + awayWOBA));
-    // Normalize
-    const total = homeScore + awayScore;
-    if (total === 0) return [0.5, 0.5];
-    return [homeScore / total, awayScore / total];
-  }
 
   // Blend odds and stats (e.g., 70% odds, 30% stats)
-  function blendProbs(oddsProb: number, statProb: number, weight = 0.7) {
-    return weight * oddsProb + (1 - weight) * statProb;
-  }
+  // blendProbs is unused, remove it
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-800 p-8 text-white font-sans">
@@ -170,10 +165,10 @@ export default function ProbabilityDashboard() {
                     return !isHRE && !isRunsSummary;
                   })
                   .map((game) => {
-                    const homeMoney = game.gamelines?.offers.find((o: any) => o.offerType === 'moneyline' && o.isHomeTeam);
-                    const awayMoney = game.gamelines?.offers.find((o: any) => o.offerType === 'moneyline' && !o.isHomeTeam);
-                    const over = game.gamelines?.offers.find((o: any) => o.offerType === 'over');
-                    const under = game.gamelines?.offers.find((o: any) => o.offerType === 'under');
+                    const homeMoney = game.gamelines?.offers.find((o) => o.offerType === 'moneyline' && o.isHomeTeam);
+                    const awayMoney = game.gamelines?.offers.find((o) => o.offerType === 'moneyline' && !o.isHomeTeam);
+                    const over = game.gamelines?.offers.find((o) => o.offerType === 'over');
+                    const under = game.gamelines?.offers.find((o) => o.offerType === 'under');
                     // Calculate implied probabilities from Pinnacle odds and devig
                     let homeProb = homeMoney ? getWinProb(homeMoney.oddsAmerican) : 0.5;
                     let awayProb = awayMoney ? getWinProb(awayMoney.oddsAmerican) : 0.5;
@@ -193,9 +188,13 @@ export default function ProbabilityDashboard() {
                     return (
                       <tr key={game.id} className="border-b border-zinc-800 hover:bg-zinc-900/40 transition">
                         <td className="py-2 px-3 font-semibold flex items-center gap-2">
-                          {awayLogo && <img src={awayLogo} alt={game.away_display} className="w-6 h-6 rounded-full bg-white" />}
+                          {awayLogo && (
+                            <Image src={awayLogo} alt={game.away_display} width={24} height={24} className="w-6 h-6 rounded-full bg-white" />
+                          )}
                           {game.away_display} @
-                          {homeLogo && <img src={homeLogo} alt={game.home_display} className="w-6 h-6 rounded-full bg-white" />}
+                          {homeLogo && (
+                            <Image src={homeLogo} alt={game.home_display} width={24} height={24} className="w-6 h-6 rounded-full bg-white" />
+                          )}
                           {game.home_display}
                         </td>
                         <td className="py-2 px-3">

@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 interface GameCardProps {
   homeTeam: string;
@@ -43,12 +44,12 @@ const GameCard: React.FC<GameCardProps> = ({
     <div className="modern-card hover:shadow-2xl transition-shadow">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <img src={awayLogo} alt={awayTeam} className="w-8 h-8 rounded-full bg-white" />
+          <Image src={awayLogo} alt={awayTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
           <span className="text-xl font-bold gradient-text drop-shadow-lg">{awayTeam}</span>
         </div>
         <span className="mx-2 text-lg">@</span>
         <div className="flex items-center gap-2">
-          <img src={homeLogo} alt={homeTeam} className="w-8 h-8 rounded-full bg-white" />
+          <Image src={homeLogo} alt={homeTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
           <span className="text-xl font-bold gradient-text drop-shadow-lg">{homeTeam}</span>
         </div>
       </div>
