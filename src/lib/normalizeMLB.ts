@@ -87,3 +87,36 @@ export function normalizeGameOdds(raw: unknown): GameOdds {
     lastUpdate: typeof obj.lastUpdate === 'string' ? new Date(obj.lastUpdate).toISOString() : '',
   };
 }
+
+export function normalizeMLBGame(raw: unknown): MLBGame {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      gamePk: 0,
+      homeTeam: normalizeMLBTeam(undefined),
+      awayTeam: normalizeMLBTeam(undefined),
+      venue: '',
+      status: '',
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  return {
+    gamePk: typeof obj.gamePk === 'number' ? obj.gamePk : 0,
+    date: typeof obj.date === 'string' ? obj.date : undefined,
+    eventId: typeof obj.eventId === 'string' ? obj.eventId : undefined,
+    gameDate: typeof obj.gameDate === 'string' ? obj.gameDate : undefined,
+    homeTeam: obj.homeTeam ? normalizeMLBTeam(obj.homeTeam) : normalizeMLBTeam(undefined),
+    awayTeam: obj.awayTeam ? normalizeMLBTeam(obj.awayTeam) : normalizeMLBTeam(undefined),
+    homePitcher: obj.homePitcher ? normalizeMLBPitcher(obj.homePitcher) : undefined,
+    awayPitcher: obj.awayPitcher ? normalizeMLBPitcher(obj.awayPitcher) : undefined,
+    venue: typeof obj.venue === 'string' ? obj.venue : '',
+    status: typeof obj.status === 'string' ? obj.status : '',
+    odds: Array.isArray(obj.odds) ? obj.odds.map(normalizeGameOdds) : undefined,
+    oddsRecord: obj.oddsRecord as Record<string, unknown> | undefined,
+    inning: typeof obj.inning === 'string' ? obj.inning : undefined,
+    homeScore: typeof obj.homeScore === 'number' ? obj.homeScore : undefined,
+    awayScore: typeof obj.awayScore === 'number' ? obj.awayScore : undefined,
+    weather: obj.weather ? normalizeWeather(obj.weather) : undefined,
+    teams: obj.teams as MLBGame['teams'] | undefined,
+    teamsLegacy: obj.teamsLegacy as MLBGame['teamsLegacy'] | undefined,
+  };
+}
