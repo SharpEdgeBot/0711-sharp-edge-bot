@@ -43,7 +43,3 @@ export async function mlbApiRateLimit(identifier: string) {
   return rateLimitMiddleware(`mlb:${identifier}`, 10, 1);
 }
 
-export async function optimalBetRateLimit(identifier: string) {
-  // OptimalBet API: 60 requests per minute
-  return rateLimitMiddleware(`optimal:${identifier}`, 60, 60);
-}

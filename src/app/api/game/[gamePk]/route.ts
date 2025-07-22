@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 // Removed missing import: getGameContext from '@/lib/slateAnalysis'
 import { buildGameContext } from '@/lib/sportsData';
+import { WeatherInfo } from '@/types/mlb';
 
 export async function GET(
   request: NextRequest,
@@ -36,17 +37,55 @@ export async function GET(
         );
       }
       
-      // You must provide eventId and apiKey for buildGameContext
+      // You must provide eventId for buildGameContext
       const eventId = searchParams.get('eventId') || '';
-      const apiKey = process.env.OPTIMAL_BET_API_KEY || '';
-      context = await buildGameContext({
+      const rawContext = await buildGameContext({
         gamePk,
         eventId,
         homeTeamId,
         awayTeamId,
         season,
-        apiKey,
       });
+      // Map TeamStats to MLBTeam
+      context = {
+        ...rawContext,
+        homeTeam: {
+          id: rawContext.homeTeam.teamId,
+          name: rawContext.homeTeam.name,
+          logo: '',
+          record: '',
+          probablePitcher: undefined,
+        },
+        awayTeam: {
+          id: rawContext.awayTeam.teamId,
+          name: rawContext.awayTeam.name,
+          logo: '',
+          record: '',
+          probablePitcher: undefined,
+        },
+        homePitcher: rawContext.homePitcher ? {
+          id: rawContext.homePitcher.playerId,
+          name: rawContext.homePitcher.name,
+          stats: {
+            era: rawContext.homePitcher.ERA,
+            whip: rawContext.homePitcher.WHIP,
+            k9: rawContext.homePitcher.K9,
+          }
+        } : undefined,
+        awayPitcher: rawContext.awayPitcher ? {
+          id: rawContext.awayPitcher.playerId,
+          name: rawContext.awayPitcher.name,
+          stats: {
+            era: rawContext.awayPitcher.ERA,
+            whip: rawContext.awayPitcher.WHIP,
+            k9: rawContext.awayPitcher.K9,
+          }
+        } : undefined,
+        venue: typeof rawContext.venue === 'string' ? rawContext.venue : '',
+        status: typeof rawContext.status === 'string' ? rawContext.status : '',
+        odds: Array.isArray(rawContext.odds) ? rawContext.odds : [],
+        weather: typeof rawContext.weather === 'object' && rawContext.weather !== null ? rawContext.weather as WeatherInfo : undefined,
+      };
     } else {
       // Try to get from cache first
       // Try to get cached context from Redis

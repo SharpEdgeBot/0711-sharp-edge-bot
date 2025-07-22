@@ -88,13 +88,12 @@ export async function fetchProbablePitchers(gamePk: number) {
 // Odds should be fetched via fetchPinnacleOdds and transformPinnacleOdds only.
 
 // Main: Build standardized game context
-export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId, season, apiKey: _apiKey }: {
+export async function buildGameContext({ gamePk, eventId, homeTeamId, awayTeamId, season }: {
   gamePk: number;
   eventId: string;
   homeTeamId: number;
   awayTeamId: number;
   season: number;
-  apiKey: string;
 }): Promise<GameContext> {
   let homeStatsRaw: unknown = {};
   let awayStatsRaw: unknown = {};
@@ -192,7 +191,7 @@ let teamsObj: TeamsObj = { home: { probablePitcher: {} }, away: { probablePitche
     // Log and continue with defaults
     console.error(`Boxscore error for gamePk ${gamePk}:`, err);
   }
-  // Odds logic should use Pinnacle odds only. Remove OptimalBet logic.
+  // Odds logic should use Pinnacle odds only.
   const gameDataObj = (boxscore as { gameData?: { datetime?: { dateTime?: string } } })?.gameData ?? { datetime: { dateTime: '' } };
   return {
     gamePk,

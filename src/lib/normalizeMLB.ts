@@ -1,4 +1,5 @@
 import type { MLBTeam, MLBPitcher, PitcherStats, WeatherInfo, GameOdds } from '@/types/mlb';
+import type { MLBGame } from '@/types/mlb';
 
 export function normalizeMLBTeam(raw: unknown): MLBTeam {
   if (!raw || typeof raw !== 'object') {
@@ -11,11 +12,24 @@ export function normalizeMLBTeam(raw: unknown): MLBTeam {
     };
   }
   const obj = raw as Record<string, unknown>;
+  let id = 0;
+  let name = '';
+  let logo = '';
+  if (obj.team && typeof obj.team === 'object') {
+    const t = obj.team as { id?: number; name?: string; logo?: string };
+    id = typeof t.id === 'number' ? t.id : 0;
+    name = typeof t.name === 'string' ? t.name : '';
+    logo = typeof t.logo === 'string' ? t.logo : '';
+  } else {
+    id = typeof obj.id === 'number' ? obj.id as number : 0;
+    name = typeof obj.name === 'string' ? obj.name as string : '';
+    logo = typeof obj.logo === 'string' ? obj.logo as string : '';
+  }
   return {
-    id: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).id === 'number' ? (obj.team as any).id : (typeof obj.id === 'number' ? obj.id : 0),
-    name: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).name === 'string' ? (obj.team as any).name : (typeof obj.name === 'string' ? obj.name : ''),
-    logo: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).logo === 'string' ? (obj.team as any).logo : (typeof obj.logo === 'string' ? obj.logo : ''),
-    record: typeof obj.record === 'object' && obj.record && typeof (obj.record as any).summary === 'string' ? (obj.record as any).summary : '',
+    id,
+    name,
+    logo,
+    record: obj.record && typeof (obj.record as { summary?: string }).summary === 'string' ? (obj.record as { summary: string }).summary : '',
     probablePitcher: obj.probablePitcher ? normalizeMLBPitcher(obj.probablePitcher) : undefined,
   };
 }
@@ -110,13 +124,13 @@ export function normalizeMLBGame(raw: unknown): MLBGame {
     awayPitcher: obj.awayPitcher ? normalizeMLBPitcher(obj.awayPitcher) : undefined,
     venue: typeof obj.venue === 'string' ? obj.venue : '',
     status: typeof obj.status === 'string' ? obj.status : '',
-    odds: Array.isArray(obj.odds) ? obj.odds.map(normalizeGameOdds) : undefined,
-    oddsRecord: obj.oddsRecord as Record<string, unknown> | undefined,
+    odds: Array.isArray(obj.odds) ? (obj.odds as unknown[]).map(normalizeGameOdds) : undefined,
+    oddsRecord: obj.oddsRecord && typeof obj.oddsRecord === 'object' ? obj.oddsRecord as Record<string, unknown> : undefined,
     inning: typeof obj.inning === 'string' ? obj.inning : undefined,
     homeScore: typeof obj.homeScore === 'number' ? obj.homeScore : undefined,
     awayScore: typeof obj.awayScore === 'number' ? obj.awayScore : undefined,
     weather: obj.weather ? normalizeWeather(obj.weather) : undefined,
-    teams: obj.teams as MLBGame['teams'] | undefined,
-    teamsLegacy: obj.teamsLegacy as MLBGame['teamsLegacy'] | undefined,
+    teams: obj.teams && typeof obj.teams === 'object' ? obj.teams as MLBGame['teams'] : undefined,
+    teamsLegacy: obj.teamsLegacy && typeof obj.teamsLegacy === 'object' ? obj.teamsLegacy as MLBGame['teamsLegacy'] : undefined,
   };
 }

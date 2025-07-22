@@ -2,7 +2,7 @@ import React from 'react';
 // import GameCard from './GameCard';
 import OddsCard from './OddsCard';
 
-import type { TeamStats, PitcherStats } from '@/types';
+// ...existing code...
 
 interface UnifiedGameCardProps {
   game: {
@@ -60,9 +60,9 @@ const UnifiedGameCard: React.FC<UnifiedGameCardProps> = ({ game, odds }) => {
       } : null,
     },
     weather: typeof game.weather === 'object' && game.weather !== null ? {
-      temp: (game.weather as any).temp ?? null,
-      wind: (game.weather as any).wind ?? null,
-      condition: (game.weather as any).condition ?? null,
+      temp: typeof game.weather?.temp === 'string' ? Number(game.weather.temp) : null,
+      wind: typeof game.weather?.wind === 'string' ? game.weather.wind : null,
+      condition: typeof game.weather?.condition === 'string' ? game.weather.condition : null,
     } : { temp: null, wind: null, condition: null },
     moneyline: odds?.moneyline ?? { home: null, away: null },
     spread: odds?.spread ?? { line: null, home: null, away: null },

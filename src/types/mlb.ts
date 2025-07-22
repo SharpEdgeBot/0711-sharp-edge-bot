@@ -60,9 +60,9 @@ export interface PitcherStats {
 }
 
 export interface WeatherInfo {
-  condition?: string;
-  temp?: string;
-  wind?: string;
+  condition?: string | null;
+  temp?: string | null;
+  wind?: string | null;
 }
 
 export interface GameOdds {

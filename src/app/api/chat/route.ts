@@ -47,9 +47,7 @@ export const POST = async (request: NextRequest) => {
         if (keys.length === 0) {
           const today = new Date().toISOString().slice(0, 10);
           const { cachePregameStats } = await import('@/lib/cachePregameStats');
-          const apiKey = process.env.OPTIMAL_BET_API_KEY!;
-          const season = new Date().getFullYear();
-          await cachePregameStats({ date: today, season, apiKey });
+          await cachePregameStats({ date: today });
           keys = await redis.keys('pregame:*');
         }
         for (const key of keys) {

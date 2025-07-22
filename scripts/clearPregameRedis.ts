@@ -14,7 +14,7 @@ async function clearPregameKeys() {
       match: 'pregame:*',
       count: 100,
     });
-    cursor = scanResult[0];
+    cursor = Number(scanResult[0]);
     const keys = scanResult[1] ?? [];
     if (keys.length > 0) {
       await redis.del(...keys);

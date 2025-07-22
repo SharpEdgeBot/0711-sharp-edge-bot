@@ -25,7 +25,11 @@ interface Game {
   awayProbablePitcherEra?: number;
   homeRecord?: string;
   awayRecord?: string;
-  weather?: unknown;
+  weather?: {
+    temp: number | null;
+    wind: string | null;
+    condition: string | null;
+  };
   odds?: {
     moneyline?: { home: number | null; away: number | null };
     spread?: { line: number | null; home: number | null; away: number | null };
@@ -89,7 +93,7 @@ export default function UnifiedGamesPage() {
       } else if (Array.isArray(data)) {
         gamesArr = data;
       } else if (Array.isArray(data.dates)) {
-        gamesArr = data.dates.flatMap((d: { games: any[] }) => d.games || []);
+        gamesArr = data.dates.flatMap((d: { games: unknown[] }) => d.games || []);
       } else {
         gamesArr = [];
       }
@@ -121,7 +125,11 @@ export default function UnifiedGamesPage() {
           awayProbablePitcherEra: g.probablePitchers?.away?.era ?? undefined,
           homeRecord: g.teams.home.leagueRecord ? `${g.teams.home.leagueRecord.wins}-${g.teams.home.leagueRecord.losses}` : "",
           awayRecord: g.teams.away.leagueRecord ? `${g.teams.away.leagueRecord.wins}-${g.teams.away.leagueRecord.losses}` : "",
-          weather: weatherArr[i],
+          weather: {
+            temp: typeof weatherArr[i]?.temp === 'number' ? weatherArr[i].temp : null,
+            wind: typeof weatherArr[i]?.wind === 'string' ? weatherArr[i].wind : null,
+            condition: typeof weatherArr[i]?.condition === 'string' ? weatherArr[i].condition : null,
+          },
           odds: oddsArr[i],
         };
       });
@@ -218,9 +226,9 @@ export default function UnifiedGamesPage() {
                 awayRecord: game.awayRecord ? ensureL5(typeof game.awayRecord === 'string' ? normalizeRecord(game.awayRecord)! : game.awayRecord) : undefined,
                 startTime: game.startTime || game.date || '',
                 weather: typeof game.weather === 'object' && game.weather !== null ? {
-                  temp: (game.weather as any).temp ?? null,
-                  wind: (game.weather as any).wind ?? null,
-                  condition: (game.weather as any).condition ?? null,
+                  temp: (game.weather && typeof (game.weather as import('@/types/mlb').WeatherInfo).temp === 'string') ? Number((game.weather as import('@/types/mlb').WeatherInfo).temp) : null,
+                  wind: (game.weather && typeof (game.weather as import('@/types/mlb').WeatherInfo).wind === 'string') ? (game.weather as import('@/types/mlb').WeatherInfo).wind : null,
+                  condition: (game.weather && typeof (game.weather as import('@/types/mlb').WeatherInfo).condition === 'string') ? (game.weather as import('@/types/mlb').WeatherInfo).condition : null,
                 } : { temp: null, wind: null, condition: null },
               };
               const safeOdds = game.odds ?? { moneyline: { home: null, away: null }, spread: { line: null, home: null, away: null }, total: { line: null, over: null, under: null }, yrfi: { over: null, under: null } };

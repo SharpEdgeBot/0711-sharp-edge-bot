@@ -15,24 +15,15 @@ export async function cachePregameStats({ date }: {
   date: string; // YYYY-MM-DD
 }) {
   try {
-    // 0. Always fetch latest Pinnacle odds and hydrate cache
+    // Only retrieve odds from Redis cache, never fetch from Pinnacle API
     const oddsByGame: Record<string, unknown[]> = {};
-    try {
-      const { fetchPinnacleOdds } = await import('./pinnacleApi');
-      const { transformPinnacleOdds } = await import('./pinnacleOddsTransform');
-      const rawOdds = await fetchPinnacleOdds();
-      if (rawOdds) {
-        const normalizedOdds = transformPinnacleOdds(rawOdds);
-        for (const odds of normalizedOdds) {
-          // Group odds by gameId for context hydration
-          if (!oddsByGame[odds.gameId]) oddsByGame[odds.gameId] = [];
-          oddsByGame[odds.gameId].push(odds);
-        }
-      } else {
-        console.warn('No Pinnacle odds returned from fetchPinnacleOdds');
+    const cachedOdds = await redis.get('pinnacle:odds');
+    if (cachedOdds && typeof cachedOdds === 'object') {
+      for (const [gameId, oddsArr] of Object.entries(cachedOdds as Record<string, unknown[]>)) {
+        oddsByGame[gameId] = oddsArr;
       }
-    } catch (_err) {
-      console.error('Error fetching Pinnacle odds:', _err);
+    } else {
+      console.warn('No Pinnacle odds found in Redis cache');
     }
     // 1. Fetch today's MLB schedule with full hydration
     const scheduleUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}&hydrate=team,linescore,probablePitcher(note),game(content),flags,liveLookin,seriesStatus`;

@@ -7,11 +7,8 @@ export const runtime = 'nodejs'; // Vercel Edge Function for fast cold starts
 export async function GET() {
   try {
     const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const season = new Date().getFullYear();
-    const apiKey = process.env.OPTIMAL_BET_API_KEY!;
-    if (!apiKey) throw new Error('Missing Optimal-Bet API key');
-      const result = await cachePregameStats({ date, season, apiKey });
-  return NextResponse.json({ status: 'ok', result });
+    const result = await cachePregameStats({ date });
+    return NextResponse.json({ status: 'ok', result });
   } catch (error: unknown) {
     // Enhanced error logging with type guard
     let errorMessage = 'Unknown error';
