@@ -35,26 +35,58 @@ export async function fetchPinnacleOdds(since?: number): Promise<PinnacleOddsRes
   const MAX_RETRIES = 3;
   while (retries < MAX_RETRIES) {
     try {
+      console.log('[Pinnacle API] Request URL:', url);
       const response = await fetch(url, options);
       if (!response.ok) {
+        let errorBody = '';
+        try {
+          errorBody = await response.text();
+        } catch (_e) {
+          errorBody = '[Failed to read error body]';
+        }
+        console.error('[Pinnacle API] Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          url,
+          options
+        });
         if (response.status === 429) {
           const sleepTime = Math.pow(2, retries) * 1000;
           await new Promise(res => setTimeout(res, sleepTime));
           retries++;
           continue;
         }
-        throw new Error(`Pinnacle API error: ${response.status}`);
+        // Return a structured error object for non-OK responses
+        return {
+          events: [],
+          last: undefined,
+          sport_id: undefined,
+          sport_name: undefined,
+          since: undefined,
+          // Attach error info for debugging
+          error: true,
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          url
+        } as PinnacleOddsResponse & {
+          error: true;
+          status: number;
+          statusText: string;
+          body: string;
+          url: string;
+        };
       }
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        // If not JSON, return null so the API route can handle it
         console.error('Pinnacle API did not return JSON. Content-Type:', contentType);
         return null;
       }
       await supabase.from('api_usage').insert({ date: new Date().toISOString(), calls_made: 1 });
       return await response.json() as PinnacleOddsResponse;
     } catch (error) {
-      console.error('Pinnacle API fetch failed:', error);
+      console.error('Pinnacle API fetch failed:', error, 'URL:', url);
       retries++;
       await new Promise(res => setTimeout(res, Math.pow(2, retries) * 1000));
     }

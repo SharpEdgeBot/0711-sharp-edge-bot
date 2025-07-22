@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
+import * as Dialog from '@radix-ui/react-dialog';
 
 interface ChatSidebarProps {
   history: Array<{ id: string; title: string; date: string }>;
@@ -11,15 +12,18 @@ interface ChatSidebarProps {
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ history, favorites, onSelectHistory, onSelectFavorite }) => {
   const { user } = useUser();
-  return (
-    <aside className="hidden md:flex flex-col w-64 h-full bg-gradient-to-b from-[#23272f] to-[#1a1a1a] glass-morph px-4 py-6 shadow-xl border-r border-[#23272f]">
+  const [open, setOpen] = useState(false);
+
+  // Sidebar content as a component
+  const sidebarContent = (
+    <div className="flex flex-col w-64 h-full bg-gradient-to-b from-[#23272f] to-[#1a1a1a] glass-morph px-4 py-6 shadow-xl border-r border-[#23272f] overflow-y-auto">
       {/* Logo & Title */}
       <div className="flex items-center mb-8">
         <Image src={user?.imageUrl || '/window.svg'} alt="Logo" width={32} height={32} className="w-8 h-8 mr-2 rounded-full" />
-  <span className="text-xl font-bold text-electric-blue">{user?.fullName || 'MLB Betting Assistant'}</span>
+        <span className="text-xl font-bold text-electric-blue">{user?.fullName || 'MLB Betting Assistant'}</span>
       </div>
       {/* Chat History */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23272f] scrollbar-track-[#1a1a1a]">
+      <div className="flex-1">
         <div className="mb-4">
           <span className="block text-sm text-gray-400">Recent Chats</span>
           {history.length === 0 ? (
@@ -56,7 +60,44 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ history, favorites, onSelectH
           ))
         )}
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile: show button to open sidebar */}
+      <div className="flex md:hidden p-2">
+        <button
+          aria-label="Open chat sidebar"
+          className="rounded-full bg-electric-blue text-[#1a1a1a] p-4 shadow-md text-2xl"
+          style={{ minWidth: 48, minHeight: 48 }}
+          onClick={() => setOpen(true)}
+        >
+          <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path stroke="#1a1a1a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+      {/* Desktop: sidebar always visible */}
+      <aside className="hidden md:flex">
+        {sidebarContent}
+      </aside>
+      {/* Mobile: sidebar as a modal drawer */}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-40" onClick={() => setOpen(false)} />
+          <Dialog.Content className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-[#23272f] to-[#1a1a1a] glass-morph px-4 py-6 shadow-xl border-r border-[#23272f] z-50 animate-slide-in overflow-y-auto">
+            <button
+              aria-label="Close sidebar"
+              className="absolute top-2 right-2 text-white text-4xl p-2 bg-black/30 rounded-full shadow-lg"
+              style={{ minWidth: 48, minHeight: 48 }}
+              onClick={() => setOpen(false)}
+            >
+              &times;
+            </button>
+            {sidebarContent}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 };
 

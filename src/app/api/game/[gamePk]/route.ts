@@ -21,7 +21,7 @@ export async function GET(
     
     console.log(`[API] Retrieving context for game ${gamePk}${forceRefresh ? ' (force refresh)' : ''}`);
     
-    let context;
+    let context: import('@/types/mlb').MLBGame | null;
     
     if (forceRefresh) {
       // Force rebuild - need homeTeamId and awayTeamId from query params
@@ -51,7 +51,7 @@ export async function GET(
       // Try to get from cache first
       // Try to get cached context from Redis
       const { getCachedPregameContext } = await import('@/lib/cachePregameStats');
-      const cachedContext = await getCachedPregameContext(gamePk);
+      const cachedContext: import('@/types/mlb').MLBGame | null = await getCachedPregameContext(gamePk);
       if (cachedContext) {
         return NextResponse.json({
           success: true,

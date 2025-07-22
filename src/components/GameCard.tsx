@@ -44,12 +44,16 @@ const GameCard: React.FC<GameCardProps> = ({
     <div className="modern-card hover:shadow-2xl transition-shadow">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Image src={awayLogo} alt={awayTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
+          {awayLogo ? (
+            <Image src={awayLogo} alt={awayTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
+          ) : null}
           <span className="text-xl font-bold gradient-text drop-shadow-lg">{awayTeam}</span>
         </div>
         <span className="mx-2 text-lg">@</span>
         <div className="flex items-center gap-2">
-          <Image src={homeLogo} alt={homeTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
+          {homeLogo ? (
+            <Image src={homeLogo} alt={homeTeam} width={32} height={32} className="w-8 h-8 rounded-full bg-white" />
+          ) : null}
           <span className="text-xl font-bold gradient-text drop-shadow-lg">{homeTeam}</span>
         </div>
       </div>
