@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import GameCard from './GameCard';
+import type { GameLineRow } from './GameLinesTable';
 import GameLinesTable from './GameLinesTable';
 
 interface Game {
@@ -23,6 +24,13 @@ interface Game {
   awayScore?: number;
 }
 
+interface OddsOffer {
+  marketType: string;
+  bookmaker: string;
+  line: number;
+  payout: number;
+  lastUpdate: string;
+}
 interface OddsGameLineRow {
   id: string;
   away: string;
@@ -30,7 +38,7 @@ interface OddsGameLineRow {
   away_display: string;
   home_display: string;
   start_date: string;
-  offers: any[];
+  offers: OddsOffer[];
 }
 
 const GamesWithOdds: React.FC = () => {
@@ -53,7 +61,7 @@ const GamesWithOdds: React.FC = () => {
           // Odds must be hydrated from cache or manually, not fetched here
           setOdds([]);
         }
-      } catch (err) {
+      } catch (_err) {
         if (isMounted) {
           setGames([]);
           setOdds([]);
@@ -72,6 +80,29 @@ const GamesWithOdds: React.FC = () => {
 
   if (loading) return <div className="text-center py-8 text-lg text-gray-400">Loading games and odds...</div>;
 
+  // Map OddsGameLineRow[] to GameLineRow[] and OddsOffer[] to Offer[]
+  function mapOddsToGameLineRow(oddsRows: OddsGameLineRow[]): GameLineRow[] {
+    return oddsRows.map(row => ({
+      id: row.id,
+      away: row.away,
+      home: row.home,
+      away_display: row.away_display,
+      home_display: row.home_display,
+      start_date: row.start_date,
+      offers: row.offers.map(o => ({
+        sportsbook: o.bookmaker ?? '',
+        oddsAmerican: typeof o.line === 'number' ? o.line : 0,
+        oddsDecimal: typeof o.payout === 'number' ? o.payout : 0,
+        line: typeof o.line === 'number' ? o.line : null,
+        isHomeTeam: false, // Set appropriately if info available
+        offerType: o.marketType === 'moneyline' ? 'moneyline' : o.marketType === 'spread' ? 'spread' : 'total',
+        lastUpdated: o.lastUpdate ?? '',
+      })),
+    }));
+  }
+
+  const mappedOdds = mapOddsToGameLineRow(odds);
+
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -80,7 +111,7 @@ const GamesWithOdds: React.FC = () => {
         ))}
       </div>
       <div className="mt-8">
-        <GameLinesTable games={odds} />
+        <GameLinesTable games={mappedOdds} />
       </div>
     </div>
   );

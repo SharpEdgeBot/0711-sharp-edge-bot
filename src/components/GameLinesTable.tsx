@@ -12,7 +12,7 @@ interface Offer {
   lastUpdated?: string;
 }
 
-interface GameLineRow {
+export interface GameLineRow {
   id: string;
   away: string;
   home: string;
@@ -21,6 +21,7 @@ interface GameLineRow {
   start_date: string;
   offers: Offer[];
 }
+
 
 interface Props {
   games: GameLineRow[];

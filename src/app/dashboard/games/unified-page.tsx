@@ -83,41 +83,48 @@ export default function UnifiedGamesPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch games");
       }
-      let gamesArr: any[] = [];
+      let gamesArr: Array<{ gamePk: string; gameDate: string; teams: { home: { team: { id: number; name: string }; leagueRecord?: { wins: number; losses: number }; score?: number }; away: { team: { id: number; name: string }; leagueRecord?: { wins: number; losses: number }; score?: number } }; status: { abstractGameState: string }; linescore?: { currentInning?: number }; venue?: { name?: string }; probablePitchers?: { home?: { fullName?: string; era?: number }; away?: { fullName?: string; era?: number } } }>; // Explicit type
       if (Array.isArray(data.games)) {
         gamesArr = data.games;
       } else if (Array.isArray(data)) {
         gamesArr = data;
       } else if (Array.isArray(data.dates)) {
         gamesArr = data.dates.flatMap((d: { games: any[] }) => d.games || []);
+      } else {
+        gamesArr = [];
       }
       // Fetch weather and odds for each game in parallel
-      const weatherArr = await Promise.all(gamesArr.map(g => fetchWeather(g.gamePk)));
-      const oddsArr = await Promise.all(gamesArr.map(g => fetchOdds(g.gamePk)));
-      const mappedGames = gamesArr.map((g, i) => ({
-        id: g.gamePk,
-        date: g.gameDate,
-        homeTeam: g.teams.home.team.name,
-        homeTeamId: g.teams.home.team.id,
-        awayTeam: g.teams.away.team.name,
-        awayTeamId: g.teams.away.team.id,
-        status: g.status.abstractGameState.toLowerCase() as "scheduled" | "live" | "final",
-        homeScore: g.teams.home.score,
-        awayScore: g.teams.away.score,
-        inning: g.linescore?.currentInning ? `Inning ${g.linescore.currentInning}` : undefined,
-        stadium: g.venue?.name || "",
-        startTime: g.gameDate ? new Date(g.gameDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        homeLogo: getLogo(g.teams.home.team.id),
-        awayLogo: getLogo(g.teams.away.team.id),
-        homeProbablePitcher: g.probablePitchers?.home?.fullName || "",
-        homeProbablePitcherEra: g.probablePitchers?.home?.era || undefined,
-        awayProbablePitcher: g.probablePitchers?.away?.fullName || "",
-        awayProbablePitcherEra: g.probablePitchers?.away?.era || undefined,
-        homeRecord: g.teams.home.leagueRecord ? `${g.teams.home.leagueRecord.wins}-${g.teams.home.leagueRecord.losses}` : "",
-        awayRecord: g.teams.away.leagueRecord ? `${g.teams.away.leagueRecord.wins}-${g.teams.away.leagueRecord.losses}` : "",
-        weather: weatherArr[i],
-        odds: oddsArr[i],
-      }));
+      const weatherArr: Array<{ temp?: number; wind?: string; condition?: string }> = await Promise.all(gamesArr.map(g => fetchWeather(g.gamePk)));
+      const oddsArr: Array<{ moneyline?: { home: number | null; away: number | null }; spread?: { line: number | null; home: number | null; away: number | null }; total?: { line: number | null; over: number | null; under: number | null }; yrfi?: { over: number | null; under: number | null } }> = await Promise.all(gamesArr.map(g => fetchOdds(g.gamePk)));
+      const mappedGames = gamesArr.map((g, i) => {
+        // Defensive fallback for scores
+        const homeScore = typeof g.teams.home.score === 'number' ? g.teams.home.score : undefined;
+        const awayScore = typeof g.teams.away.score === 'number' ? g.teams.away.score : undefined;
+        return {
+          id: g.gamePk,
+          date: g.gameDate,
+          homeTeam: g.teams.home.team.name,
+          homeTeamId: g.teams.home.team.id,
+          awayTeam: g.teams.away.team.name,
+          awayTeamId: g.teams.away.team.id,
+          status: g.status?.abstractGameState?.toLowerCase() as "scheduled" | "live" | "final",
+          homeScore,
+          awayScore,
+          inning: g.linescore?.currentInning ? `Inning ${g.linescore.currentInning}` : undefined,
+          stadium: g.venue?.name || "",
+          startTime: g.gameDate ? new Date(g.gameDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+          homeLogo: getLogo(g.teams.home.team.id),
+          awayLogo: getLogo(g.teams.away.team.id),
+          homeProbablePitcher: g.probablePitchers?.home?.fullName || "",
+          homeProbablePitcherEra: g.probablePitchers?.home?.era ?? undefined,
+          awayProbablePitcher: g.probablePitchers?.away?.fullName || "",
+          awayProbablePitcherEra: g.probablePitchers?.away?.era ?? undefined,
+          homeRecord: g.teams.home.leagueRecord ? `${g.teams.home.leagueRecord.wins}-${g.teams.home.leagueRecord.losses}` : "",
+          awayRecord: g.teams.away.leagueRecord ? `${g.teams.away.leagueRecord.wins}-${g.teams.away.leagueRecord.losses}` : "",
+          weather: weatherArr[i],
+          odds: oddsArr[i],
+        };
+      });
       setGames(mappedGames);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";

@@ -1,46 +1,89 @@
-import type { MLBGame, MLBTeam, MLBPitcher, PitcherStats, WeatherInfo, GameOdds } from '@/types/mlb';
+import type { MLBTeam, MLBPitcher, PitcherStats, WeatherInfo, GameOdds } from '@/types/mlb';
 
-export function normalizeMLBTeam(raw: any): MLBTeam {
+export function normalizeMLBTeam(raw: unknown): MLBTeam {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: 0,
+      name: '',
+      logo: '',
+      record: '',
+      probablePitcher: undefined,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
   return {
-    id: raw.team?.id || raw.id,
-    name: raw.team?.name || raw.name || '',
-    logo: raw.team?.logo || raw.logo || '',
-    record: raw.record?.summary || '',
-    probablePitcher: raw.probablePitcher ? normalizeMLBPitcher(raw.probablePitcher) : undefined,
+    id: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).id === 'number' ? (obj.team as any).id : (typeof obj.id === 'number' ? obj.id : 0),
+    name: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).name === 'string' ? (obj.team as any).name : (typeof obj.name === 'string' ? obj.name : ''),
+    logo: typeof obj.team === 'object' && obj.team && typeof (obj.team as any).logo === 'string' ? (obj.team as any).logo : (typeof obj.logo === 'string' ? obj.logo : ''),
+    record: typeof obj.record === 'object' && obj.record && typeof (obj.record as any).summary === 'string' ? (obj.record as any).summary : '',
+    probablePitcher: obj.probablePitcher ? normalizeMLBPitcher(obj.probablePitcher) : undefined,
   };
 }
 
-export function normalizeMLBPitcher(raw: any): MLBPitcher {
+export function normalizeMLBPitcher(raw: unknown): MLBPitcher {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: 0,
+      name: '',
+      stats: undefined,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
   return {
-    id: raw.id,
-    name: raw.fullName || raw.name || '',
-    stats: raw.stats ? normalizePitcherStats(raw.stats) : undefined,
+    id: typeof obj.id === 'number' ? obj.id : 0,
+    name: typeof obj.fullName === 'string' ? obj.fullName : (typeof obj.name === 'string' ? obj.name : ''),
+    stats: obj.stats ? normalizePitcherStats(obj.stats) : undefined,
   };
 }
 
-export function normalizePitcherStats(raw: any): PitcherStats {
+export function normalizePitcherStats(raw: unknown): PitcherStats {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      era: undefined,
+      whip: undefined,
+      k9: undefined,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
   return {
-    era: raw.era,
-    whip: raw.whip,
-    k9: raw.k9,
-    // Add more as needed
+    era: typeof obj.era === 'number' ? obj.era : undefined,
+    whip: typeof obj.whip === 'number' ? obj.whip : undefined,
+    k9: typeof obj.k9 === 'number' ? obj.k9 : undefined,
   };
 }
 
-export function normalizeWeather(raw: any): WeatherInfo {
+export function normalizeWeather(raw: unknown): WeatherInfo {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      condition: undefined,
+      temp: undefined,
+      wind: undefined,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
   return {
-    condition: raw.condition,
-    temp: raw.temp,
-    wind: raw.wind,
+    condition: typeof obj.condition === 'string' ? obj.condition : undefined,
+    temp: typeof obj.temp === 'string' ? obj.temp : undefined,
+    wind: typeof obj.wind === 'string' ? obj.wind : undefined,
   };
 }
 
-export function normalizeGameOdds(raw: any): GameOdds {
+export function normalizeGameOdds(raw: unknown): GameOdds {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      marketType: '',
+      bookmaker: '',
+      line: 0,
+      payout: 0,
+      lastUpdate: '',
+    };
+  }
+  const obj = raw as Record<string, unknown>;
   return {
-    marketType: raw.marketType,
-    bookmaker: raw.bookmaker,
-    line: raw.line,
-    payout: raw.payout,
-    lastUpdate: new Date(raw.lastUpdate).toISOString(),
+    marketType: typeof obj.marketType === 'string' ? obj.marketType : '',
+    bookmaker: typeof obj.bookmaker === 'string' ? obj.bookmaker : '',
+    line: typeof obj.line === 'number' ? obj.line : 0,
+    payout: typeof obj.payout === 'number' ? obj.payout : 0,
+    lastUpdate: typeof obj.lastUpdate === 'string' ? new Date(obj.lastUpdate).toISOString() : '',
   };
 }
